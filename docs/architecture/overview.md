@@ -10,7 +10,8 @@ rust-netutils/
 │   ├── net-icmp/     private (publish = false): ICMP echo engine (sockets, Windows API, shared Pinger)
 │   ├── certwatch/    library + binary
 │   ├── dnswatch/     library + binary
-│   └── meshping/     library + binary
+│   ├── meshping/     library + binary
+│   └── portwatch/    library + binary
 ├── docs/             architecture, utility docs, benchmark reports
 └── scripts/          reproducible benchmark harnesses
 ```
@@ -88,3 +89,12 @@ Used by netprobe and meshping. It holds the socket strategy (datagram, then raw,
 | Shared `Pinger` per address family | Raw sockets receive every ICMP packet, so N sockets cost O(N²). Measured: 9.5% → 2.5% CPU for 100 hosts. |
 | TCP mode times a handshake or a refusal; never silently mixed with ICMP | Both prove reachability. Every sample is labelled with its mode. |
 | Rolling ring buffer per host plus lifetime counters | Constant memory for runs of any length. |
+
+## portwatch
+
+| Decision | Reason |
+|---|---|
+| Socket tables from the `netstat2` crate (MIT/Apache) | One maintained abstraction over netlink, IP Helper and libproc, instead of three hand-written FFI layers. Cost: a `bindgen` build dependency (code is generated only on macOS). |
+| Own Linux PID mapping with an inode-keyed owner cache | Scanning `/proc/*/fd` dominated idle watch cost. It is now done only when unknown sockets appear: idle CPU 10% → 6%, RSS 10.5 → 2.8 MiB. |
+| No deduplication of identical-looking sockets | Sockets bound per interface (`SO_BINDTODEVICE`) look identical but are distinct. Counts match `ss` exactly. |
+| grep-like exit status | `portwatch -p 8080` works directly as a shell condition. |

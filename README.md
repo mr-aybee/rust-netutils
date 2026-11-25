@@ -20,8 +20,9 @@ rust-netutils is a collection of single-purpose command-line tools for developer
 | [**certwatch**](docs/utilities/certwatch.md) | ✅ 0.1.0 | TLS certificate inspection and expiry monitoring for many endpoints |
 | [**dnswatch**](docs/utilities/dnswatch.md) | ✅ 0.1.0 | DNS change monitoring, propagation waiting and resolver comparison |
 | [**meshping**](docs/utilities/meshping.md) | ✅ 0.1.0 | Continuous latency and loss monitoring for many hosts (ICMP or TCP) |
+| [**portwatch**](docs/utilities/portwatch.md) | ✅ 0.1.0 | Sockets, listening ports and owning processes, with change watching |
 
-More utilities (socket inspection, port forwarding, throughput testing and others) will be added here only once they are implemented and tested.
+More utilities (port forwarding, throughput testing, subnet discovery) will be added here only once they are implemented and tested.
 
 ## Key features
 
@@ -66,13 +67,14 @@ certwatch check vault.internal:8200 --ca-file root.pem -v   # inspect a private-
 ## Use cases
 
 - **CI/CD smoke tests**: check that a deployment answers on the right port with the right status code. The exit code fails the pipeline.
+- **Port conflicts and unexpected listeners**: `portwatch -l` shows what is listening and who owns it; `--watch` catches listeners that come and go.
 - **Firewall and security-group debugging**: distinguish *refused*, *timed out* and *unreachable*.
 - **DNS migrations**: compare old and new resolvers with `dnswatch compare`, and block a cut-over script until a change has propagated with `dnswatch wait`.
 - **Certificate hygiene**: find certificates that are expiring, expired, untrusted, hostname-mismatched or served with an incomplete chain across an inventory of endpoints, before users notice.
 
 ## Performance
 
-Measured on an Intel Xeon E5-2620 v2 running Linux. Full methodology: [netprobe](docs/benchmarks/netprobe.md), [certwatch](docs/benchmarks/certwatch.md), [dnswatch](docs/benchmarks/dnswatch.md), [meshping](docs/benchmarks/meshping.md).
+Measured on an Intel Xeon E5-2620 v2 running Linux. Full methodology: [netprobe](docs/benchmarks/netprobe.md), [certwatch](docs/benchmarks/certwatch.md), [dnswatch](docs/benchmarks/dnswatch.md), [meshping](docs/benchmarks/meshping.md), [portwatch](docs/benchmarks/portwatch.md).
 
 | Utility | Workload | Result | Peak RSS | Startup | Binary |
 |---|---|---|---|---|---|
@@ -80,6 +82,7 @@ Measured on an Intel Xeon E5-2620 v2 running Linux. Full methodology: [netprobe]
 | certwatch | 100 loopback TLS endpoints, concurrency 20 | 0.20–0.22 s total | 5.4 MiB | 3.8 ms | 2.7 MiB |
 | dnswatch | 1,000 DNS queries to a local stub, concurrency 64 | 0.12–0.13 s total | 5.9 MiB | 3.7 ms | 2.4 MiB |
 | meshping | 100 hosts at 1 Hz (ICMP), sustained | 2.5% of one core (median) | 6.8 MiB | — | 1.1 MiB |
+| portwatch | 10,000-socket snapshot with PIDs | 252 ms (`ss -tanp`: 422 ms) | 7.4 MiB | — | 1.0 MiB |
 
 ## Architecture
 
