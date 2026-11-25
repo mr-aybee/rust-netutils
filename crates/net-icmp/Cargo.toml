@@ -1,0 +1,21 @@
+[package]
+name = "net-icmp"
+version = "0.1.0"
+description = "Private ICMP echo engine shared by rust-netutils binaries"
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+socket2 = { version = "0.6.5", features = ["all"] }
+tokio = { version = "1.54.1", features = ["rt", "net", "time", "sync"] }
+
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_IO"] }
+
+[dev-dependencies]
+proptest = "1.12.0"

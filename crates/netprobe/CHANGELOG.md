@@ -4,6 +4,11 @@ All notable changes to this crate are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the crate uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- Internal: the ICMP engine moved to the shared private `net-icmp` crate. On raw sockets, echo replies must now also come from the probed address.
+
 ## [0.2.0] - 2026-11-25
 
 ### Added
