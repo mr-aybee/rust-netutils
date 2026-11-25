@@ -22,6 +22,7 @@ fn listener() -> (TcpListener, String) {
     (l, addr)
 }
 
+#[cfg(not(windows))]
 fn closed_port() -> String {
     TcpListener::bind("127.0.0.1:0")
         .unwrap()
