@@ -181,7 +181,7 @@ On Linux, unprivileged ping is enabled with:
 sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
 ```
 
-**Validation status.** Every feature has been run by hand on Linux x86_64. CI builds and runs the automated test suite on Linux (x86_64, ARM64), Windows (x86_64, ARM64) and macOS (Apple Silicon). macOS x86_64 is cross-compiled in CI but not tested there. On Windows, ICMP through the IP Helper API is exercised by CI tests (loopback echo). ICMP on macOS has not been verified at runtime.
+**Validation status.** Every feature has been run by hand on Linux x86_64. CI builds and runs the automated test suite on Linux (x86_64, ARM64), Windows (x86_64, ARM64) and macOS (Apple Silicon). macOS x86_64 is cross-compiled in CI but not tested there. On Windows, ICMP through the IP Helper API passes loopback tests in CI on x86_64 and ARM64. GitHub's Windows runners run elevated, so the claim that it works without Administrator rights rests on Microsoft's API documentation and has not been verified in CI. ICMP on macOS has not been verified at runtime.
 
 ## Limitations
 
