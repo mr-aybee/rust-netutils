@@ -516,6 +516,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "dnswatch"
+version = "0.1.0"
+dependencies = [
+ "assert_cmd",
+ "clap",
+ "hickory-resolver",
+ "net-common",
+ "predicates",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "either"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
