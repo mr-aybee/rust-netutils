@@ -5,8 +5,9 @@
 ```text
 rust-netutils/
 ├── crates/
-│   ├── net-common/   private (publish = false): exit statuses, duration parsing
-│   └── netprobe/     library + binary
+│   ├── net-common/   private (publish = false): exit statuses, duration and endpoint parsing
+│   ├── netprobe/     library + binary
+│   └── certwatch/    library + binary
 ├── docs/             architecture, utility docs, benchmark reports
 └── scripts/          reproducible benchmark harnesses
 ```
@@ -41,3 +42,23 @@ flowchart LR
 | Deadline enforced in the runner; UDP and ICMP enforce their own | A generic deadline turns a hang into "timed out". UDP needs silence to mean *inconclusive*, so it handles its own timeout and the runner allows a grace period. |
 | Three outcomes (`ok` / `failed` / `inconclusive`) and exit code 3 | Prevents reporting UDP silence as either open or closed. |
 | `unsafe_code = "deny"`, one documented exception | Socket setup goes through `socket2`'s safe API. The only `unsafe` is Windows ICMP FFI (`icmp_windows.rs`), which is the only way to ping on Windows without Administrator rights. |
+
+## certwatch
+
+```mermaid
+flowchart LR
+    CLI[cli.rs] --> MAIN[main.rs<br/>targets, bounded concurrency, Ctrl+C]
+    MAIN --> CHECK[check.rs<br/>connect, handshake, policy]
+    MAIN --> INSPECT[inspect.rs<br/>local PEM/DER]
+    CHECK --> TLS[tls.rs<br/>RecordingVerifier around WebPKI]
+    CHECK --> CERT[cert.rs<br/>x509-parser summary]
+    INSPECT --> CERT
+    MAIN --> OUT[output.rs<br/>human / JSON]
+```
+
+| Decision | Reason |
+|---|---|
+| `RecordingVerifier` wraps the real WebPKI verifier and records its verdict | One handshake gives both the chain and the exact validation error, so expired or untrusted chains can still be inspected. No data is sent, and failures are always reported. |
+| `x509-parser` for certificate details; `ring` for fingerprints | Mature parser; `ring` is already in the tree through rustls. |
+| Separate `Warning` exit code (4) | CI can treat "expiring soon" differently from "broken". |
+| Dates formatted with an internal civil-calendar routine | Avoids a date/time dependency for a single conversion. |

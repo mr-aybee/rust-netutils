@@ -17,12 +17,13 @@ rust-netutils is a collection of single-purpose command-line tools for developer
 | Utility | Status | Purpose |
 |---|---|---|
 | [**netprobe**](docs/utilities/netprobe.md) | ✅ 0.2.0 | TCP, DNS, HTTP(S), UDP and ICMP diagnostics with timing breakdowns |
+| [**certwatch**](docs/utilities/certwatch.md) | ✅ 0.1.0 | TLS certificate inspection and expiry monitoring for many endpoints |
 
-More utilities (TLS certificate monitoring, multi-host latency, socket inspection and others) will be added here only once they are implemented and tested.
+More utilities (multi-host latency, DNS change monitoring, socket inspection and others) will be added here only once they are implemented and tested.
 
 ## Key features
 
-- **One binary per tool**, no runtime dependencies; about 4 MiB for netprobe.
+- **One binary per tool**, no runtime dependencies: about 4 MiB for netprobe and 2.7 MiB for certwatch.
 - **Honest results**: three outcomes (`ok`, `failed`, `inconclusive`). For example, UDP silence is never reported as "closed".
 - **Secure defaults**: TLS verification is always on; `--insecure` is explicit and prints a warning; inputs are validated and bounded.
 - **Automation-friendly**: `--json`, stable exit codes, diagnostics on stderr.
@@ -56,6 +57,8 @@ netprobe http https://example.com -v                # where does the time go?
 netprobe dns example.com -T MX -s 1.1.1.1           # what does this resolver say?
 netprobe tcp db.internal:5432 -c 10 -i 200ms -q     # latency percentiles
 netprobe batch smoke.txt -j 32 --json > report.json # many checks at once
+certwatch check -f endpoints.txt --crit-days 14     # fail CI before certificates expire
+certwatch check vault.internal:8200 --ca-file root.pem -v   # inspect a private-PKI chain
 ```
 
 ## Use cases
@@ -63,18 +66,16 @@ netprobe batch smoke.txt -j 32 --json > report.json # many checks at once
 - **CI/CD smoke tests**: check that a deployment answers on the right port with the right status code. The exit code fails the pipeline.
 - **Firewall and security-group debugging**: distinguish *refused*, *timed out* and *unreachable*.
 - **DNS migrations**: query the old and new resolvers directly and compare the answers.
-- **TLS problems**: certificate failures are reported with the exact reason (expired, wrong host, untrusted).
+- **Certificate hygiene**: find certificates that are expiring, expired, untrusted, hostname-mismatched or served with an incomplete chain across an inventory of endpoints, before users notice.
 
 ## Performance
 
-Measured on an Intel Xeon E5-2620 v2 running Linux (full methodology in [docs/benchmarks/netprobe.md](docs/benchmarks/netprobe.md)):
+Measured on an Intel Xeon E5-2620 v2 running Linux. Full methodology: [netprobe](docs/benchmarks/netprobe.md), [certwatch](docs/benchmarks/certwatch.md).
 
-| Metric | Result |
-|---|---|
-| Loopback TCP probes/s (concurrency 64, 10,000 jobs) | 4,386 – 6,410 (median 5,051) |
-| Peak RSS for that batch | 17 MiB |
-| Startup (`--version`) | 4.6 ms |
-| Binary size | 3.9 MiB |
+| Utility | Workload | Result | Peak RSS | Startup | Binary |
+|---|---|---|---|---|---|
+| netprobe | 10,000 loopback TCP probes, concurrency 64 | 4,386–6,410 probes/s | 17 MiB | 4.6 ms | 3.9 MiB |
+| certwatch | 100 loopback TLS endpoints, concurrency 20 | 0.20–0.22 s total | 5.4 MiB | 3.8 ms | 2.7 MiB |
 
 ## Architecture
 
