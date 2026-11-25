@@ -3,6 +3,8 @@
 //! This crate is private (`publish = false`). It holds only conventions that
 //! every utility must apply identically: exit codes and duration parsing.
 
+pub mod target;
+
 use std::fmt;
 use std::time::Duration;
 
@@ -18,19 +20,22 @@ pub enum Status {
     Usage = 2,
     /// No failure, but at least one result could not be determined.
     Inconclusive = 3,
+    /// No failure, but at least one check needs attention soon (e.g. certificate expiring).
+    Warning = 4,
 }
 
 impl Status {
     /// Combine two statuses, keeping the most severe one.
-    /// Severity: Usage > Failure > Inconclusive > Ok.
+    /// Severity: Usage > Failure > Warning > Inconclusive > Ok.
     #[must_use]
     pub fn worst(self, other: Status) -> Status {
         fn rank(s: Status) -> u8 {
             match s {
                 Status::Ok => 0,
                 Status::Inconclusive => 1,
-                Status::Failure => 2,
-                Status::Usage => 3,
+                Status::Warning => 2,
+                Status::Failure => 3,
+                Status::Usage => 4,
             }
         }
         if rank(other) > rank(self) {
@@ -123,5 +128,7 @@ mod tests {
         assert_eq!(Failure.worst(Inconclusive), Failure);
         assert_eq!(Ok.worst(Ok), Ok);
         assert_eq!(Usage.worst(Failure), Usage);
+        assert_eq!(Warning.worst(Inconclusive), Warning);
+        assert_eq!(Warning.worst(Failure), Failure);
     }
 }

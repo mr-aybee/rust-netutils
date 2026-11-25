@@ -9,5 +9,6 @@ pub mod output;
 pub mod probe;
 pub mod runner;
 pub mod stats;
-pub mod target;
+/// Endpoint parsing, shared with other rust-netutils binaries.
+pub use net_common::target;
 pub mod url;
