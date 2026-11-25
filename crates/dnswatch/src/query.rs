@@ -10,10 +10,12 @@ use hickory_resolver::net::runtime::TokioRuntimeProvider;
 use hickory_resolver::proto::rr::RecordType;
 use serde::Serialize;
 
+/// Record types accepted by `--type`.
 pub const SUPPORTED: &[&str] = &[
     "A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "PTR", "SRV", "CAA",
 ];
 
+/// Parse a record type name (case-insensitive) from [`SUPPORTED`].
 pub fn parse_type(s: &str) -> Result<RecordType, String> {
     let up = s.trim().to_ascii_uppercase();
     if !SUPPORTED.contains(&up.as_str()) {
@@ -41,10 +43,12 @@ pub enum Answer {
 }
 
 impl Answer {
+    /// Whether this is a definitive state (records, NXDOMAIN or NODATA) rather than an error.
     pub fn is_definitive(&self) -> bool {
         !matches!(self, Answer::Error(_))
     }
 
+    /// Short human-readable description of the answer.
     pub fn summary(&self) -> String {
         match self {
             Answer::Records(r) if r.is_empty() => "(empty)".into(),
@@ -92,10 +96,13 @@ pub fn diff(old: &Answer, new: &Answer) -> (Vec<String>, Vec<String>) {
 
 /// A resolver to query and how it is labelled in output.
 pub struct Source {
+    /// Label used in output: the server address, or `system`.
     pub label: String,
+    /// Resolver with caching disabled and a single attempt per query.
     pub resolver: TokioResolver,
 }
 
+/// Build a source for `server`, or for the system resolver when `None`.
 pub fn build_source(server: Option<SocketAddr>, timeout: Duration) -> Result<Source, String> {
     let provider = TokioRuntimeProvider::default();
 
@@ -137,6 +144,7 @@ pub fn build_source(server: Option<SocketAddr>, timeout: Duration) -> Result<Sou
     Ok(Source { label, resolver })
 }
 
+/// Query `name`/`rtype` once and classify the result.
 pub async fn query(resolver: &TokioResolver, name: &str, rtype: RecordType) -> Answer {
     match resolver.lookup(name, rtype).await {
         Ok(lookup) => {

@@ -17,13 +17,18 @@ use crate::tls::{RecordingVerifier, classify};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Verdict {
+    /// Chain valid and nothing expires within the warning threshold.
     Ok,
+    /// Valid, but a certificate expires within the warning threshold.
     Warning,
+    /// Validation failed or a certificate expires within the critical threshold.
     Critical,
+    /// No certificate could be obtained (DNS, connect, timeout or handshake failure).
     Error,
 }
 
 impl Verdict {
+    /// Upper-case label used in human output.
     pub fn label(self) -> &'static str {
         match self {
             Verdict::Ok => "OK",
@@ -37,18 +42,26 @@ impl Verdict {
 /// Expiry thresholds in days.
 #[derive(Debug, Clone, Copy)]
 pub struct Policy {
+    /// Days before expiry at which a certificate becomes a warning.
     pub warn_days: i64,
+    /// Days before expiry at which a certificate becomes critical.
     pub crit_days: i64,
 }
 
+/// Outcome of checking one target or inspecting one file.
 #[derive(Debug, Clone, Serialize)]
 pub struct CheckResult {
+    /// Target as `HOST:PORT`, or the file path for `inspect`.
     pub target: String,
+    /// Overall verdict.
     pub verdict: Verdict,
+    /// Address actually connected to.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub address: Option<SocketAddr>,
+    /// Server name sent in the TLS handshake and validated.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sni: Option<String>,
+    /// Negotiated protocol version, e.g. `TLS 1.3`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tls_version: Option<String>,
     /// Chain validation passed (trust, hostname, validity period). Absent for local files.
@@ -57,6 +70,7 @@ pub struct CheckResult {
     /// Category of the validation failure (`expired`, `hostname_mismatch`, `untrusted`, ...).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub validation_error_kind: Option<&'static str>,
+    /// Human-readable problems: validation errors, expiry and weaknesses.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub problems: Vec<String>,
     /// Days until the leaf certificate expires.
@@ -68,10 +82,12 @@ pub struct CheckResult {
     /// Presented chain, leaf first.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub chain: Vec<CertInfo>,
+    /// Wall time spent on this target, in milliseconds.
     pub elapsed_ms: f64,
 }
 
 impl CheckResult {
+    /// Result for a target where no certificate could be obtained.
     pub fn error(target: String, msg: String, start: Instant) -> Self {
         Self {
             target,
@@ -90,6 +106,7 @@ impl CheckResult {
     }
 }
 
+/// Current time as Unix seconds.
 pub fn now_unix() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

@@ -15,7 +15,9 @@ use crate::query::{Answer, Source, diff, query};
 /// One (name, type) pair to query on every source.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Query {
+    /// Domain name to query.
     pub name: String,
+    /// Record type to query.
     pub rtype: RecordType,
 }
 
@@ -60,32 +62,48 @@ pub async fn poll(
         .collect()
 }
 
+/// Kind of watch event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
+    /// First definitive answer for a name/type/server.
     Initial,
+    /// Definitive answer differs from the previous one.
     Changed,
+    /// Query failed (reported once per failure streak).
     Error,
+    /// Query succeeds again with the same answer as before the failures.
     Recovered,
 }
 
+/// One watch event, printed as a line or a JSON object.
 #[derive(Debug, Serialize)]
 pub struct Event<'a> {
+    /// Event time (ISO 8601, UTC).
     pub time: String,
+    /// Event kind.
     pub event: Kind,
+    /// Queried name.
     pub name: &'a str,
+    /// Queried record type.
     #[serde(rename = "type")]
     pub rtype: String,
+    /// Server label.
     pub server: &'a str,
+    /// Current answer.
     pub answer: &'a Answer,
+    /// Previous definitive answer, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub previous: Option<&'a Answer>,
+    /// Records present now but not before.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub added: Vec<String>,
+    /// Records present before but not now.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub removed: Vec<String>,
 }
 
+/// Print an event as a human-readable line or as one JSON object.
 pub fn emit(e: &Event<'_>, json: bool) {
     let line = if json {
         serde_json::to_string(e).unwrap_or_default()
@@ -124,8 +142,11 @@ pub fn emit(e: &Event<'_>, json: bool) {
 
 /// Settings shared by the workflows.
 pub struct Settings {
+    /// Time between polls.
     pub interval: Duration,
+    /// Maximum queries in flight.
     pub concurrency: usize,
+    /// Emit JSON Lines instead of text.
     pub json: bool,
 }
 
@@ -271,13 +292,18 @@ pub async fn wait(
 /// Result of a one-shot comparison of all sources.
 #[derive(Debug, Serialize)]
 pub struct Comparison {
+    /// Queried name.
     pub name: String,
+    /// Queried record type.
     #[serde(rename = "type")]
     pub rtype: String,
+    /// Whether every server returned the same definitive answer.
     pub consistent: bool,
+    /// Answer per server label, in `--server` order.
     pub answers: Vec<(String, Answer)>,
 }
 
+/// Query every name/type on every source once and compare the answers.
 pub async fn compare(
     sources: Arc<Vec<Source>>,
     queries: Arc<Vec<Query>>,

@@ -12,6 +12,7 @@ use crate::check::{CheckResult, Policy, evaluate, now_unix};
 /// Refuse files larger than this to keep memory bounded.
 pub const MAX_FILE: u64 = 16 * 1024 * 1024;
 
+/// Split a PEM bundle into DER certificates, or treat non-PEM input as one DER certificate.
 pub fn read_certs(bytes: &[u8]) -> Result<Vec<Vec<u8>>, String> {
     if bytes.windows(11).any(|w| w == b"-----BEGIN ") {
         let certs: Vec<Vec<u8>> = CertificateDer::pem_slice_iter(bytes)
@@ -31,6 +32,7 @@ pub fn read_certs(bytes: &[u8]) -> Result<Vec<Vec<u8>>, String> {
     }
 }
 
+/// Inspect a local certificate file and apply the expiry policy (no trust evaluation).
 pub fn inspect(path: &Path, policy: Policy) -> CheckResult {
     let start = Instant::now();
     let target = path.display().to_string();

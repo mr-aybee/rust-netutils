@@ -8,10 +8,13 @@ use netstat2::get_sockets_info;
 use netstat2::{AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo, TcpState};
 use serde::Serialize;
 
+/// Transport protocol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Proto {
+    /// TCP.
     Tcp,
+    /// UDP.
     Udp,
 }
 
@@ -27,14 +30,19 @@ impl std::fmt::Display for Proto {
 /// One socket. `remote` and `state` are absent for UDP.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Sock {
+    /// Transport protocol.
     pub proto: Proto,
+    /// Local address and port.
     pub local: SocketAddr,
+    /// Remote address and port (TCP only; `0.0.0.0:0` for listeners).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remote: Option<SocketAddr>,
+    /// TCP state name, e.g. `LISTEN` (TCP only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state: Option<String>,
     /// Owning process IDs (empty when the OS does not reveal them to this user).
     pub pids: Vec<u32>,
+    /// Name of the first owning process, where available (Linux).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub process: Option<String>,
 }
@@ -44,6 +52,7 @@ pub struct Sock {
 pub type Key = (Proto, SocketAddr, Option<SocketAddr>);
 
 impl Sock {
+    /// Identity used to match this socket across snapshots.
     pub fn key(&self) -> Key {
         (self.proto, self.local, self.remote)
     }
@@ -69,9 +78,13 @@ fn process_name(_pid: u32) -> Option<String> {
 /// Which address families and protocols to read.
 #[derive(Debug, Clone, Copy)]
 pub struct Scope {
+    /// Include TCP sockets.
     pub tcp: bool,
+    /// Include UDP sockets.
     pub udp: bool,
+    /// Include IPv4 sockets.
     pub ipv4: bool,
+    /// Include IPv6 sockets.
     pub ipv6: bool,
 }
 
@@ -155,6 +168,7 @@ pub struct Snapshotter {
 }
 
 impl Snapshotter {
+    /// Take a snapshot, sorted by protocol, local port, local address and remote.
     #[cfg(target_os = "linux")]
     pub fn take(&mut self, scope: Scope) -> Result<Vec<Sock>, String> {
         let (af, pf) = flags(scope);
@@ -274,16 +288,20 @@ pub struct Filter {
     pub ports: Vec<u16>,
     /// Match the local port only.
     pub local_ports: Vec<u16>,
+    /// Match sockets owned by any of these PIDs.
     pub pids: Vec<u32>,
     /// Upper-case TCP state names, e.g. LISTEN, ESTABLISHED.
     pub states: Vec<String>,
     /// Only listening TCP sockets and bound UDP sockets.
     pub listening: bool,
+    /// Match process names containing this text (case-insensitive).
     pub process: Option<String>,
+    /// Match this local or remote IP address.
     pub address: Option<IpAddr>,
 }
 
 impl Filter {
+    /// Whether `s` passes every configured filter.
     pub fn matches(&self, s: &Sock) -> bool {
         let remote_port = s.remote.map(|r| r.port());
 
@@ -337,12 +355,27 @@ impl Filter {
     }
 }
 
+/// A difference between two snapshots.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "event", rename_all = "lowercase")]
 pub enum Change {
-    Opened { socket: Sock },
-    Closed { socket: Sock },
-    State { socket: Sock, previous: String },
+    /// A socket appeared.
+    Opened {
+        /// The new socket.
+        socket: Sock,
+    },
+    /// A socket disappeared.
+    Closed {
+        /// The socket as last seen.
+        socket: Sock,
+    },
+    /// A TCP socket changed state.
+    State {
+        /// The socket in its new state.
+        socket: Sock,
+        /// The previous TCP state name.
+        previous: String,
+    },
 }
 
 /// Events turning `old` into `new` (both already filtered), in deterministic order.

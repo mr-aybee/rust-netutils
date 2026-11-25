@@ -47,6 +47,7 @@ impl Status {
         }
     }
 
+    /// Numeric process exit code.
     #[must_use]
     pub fn code(self) -> u8 {
         self as u8

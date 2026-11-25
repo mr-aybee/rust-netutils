@@ -24,9 +24,12 @@ use crate::url::HttpUrl;
 /// Maximum response head size accepted; larger heads are reported as errors.
 const MAX_HEAD: usize = 16 * 1024;
 
+/// HTTP request method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {
+    /// `GET`.
     Get,
+    /// `HEAD`.
     Head,
 }
 
@@ -39,8 +42,10 @@ impl Method {
     }
 }
 
+/// Request settings for the HTTP probe.
 #[derive(Debug, Clone)]
 pub struct HttpOptions {
+    /// Request method.
     pub method: Method,
     /// Accepted status codes; empty means 200-399.
     pub expect: Vec<u16>,
@@ -143,7 +148,9 @@ impl ServerCertVerifier for NoCertVerification {
 /// Parsed response status line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatusLine {
+    /// Three-digit status code.
     pub code: u16,
+    /// Reason phrase (may be empty).
     pub reason: String,
 }
 
@@ -236,6 +243,7 @@ async fn exchange<S: AsyncRead + AsyncWrite + Unpin>(
     Ok((head, ttfb.unwrap_or_default()))
 }
 
+/// Serialize the HTTP/1.1 request (`Connection: close`, no body).
 pub fn build_request(url: &HttpUrl, method: Method) -> Vec<u8> {
     format!(
         "{} {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: netprobe/{}\r\nAccept: */*\r\nConnection: close\r\n\r\n",
@@ -247,6 +255,7 @@ pub fn build_request(url: &HttpUrl, method: Method) -> Vec<u8> {
     .into_bytes()
 }
 
+/// Send one request and record status and per-phase timings.
 pub async fn probe(
     url: &HttpUrl,
     tls: Option<&Arc<ClientConfig>>,

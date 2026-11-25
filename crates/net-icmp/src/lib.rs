@@ -27,9 +27,12 @@ const TIME_EXCEEDED_V6: u8 = 3;
 /// Bytes of payload carried in each echo request.
 pub const PAYLOAD_LEN: usize = 32;
 
+/// Which kind of socket an [`IcmpSocket`] uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SocketKind {
+    /// Unprivileged datagram ICMP socket.
     Datagram,
+    /// Raw ICMP socket (requires privileges).
     Raw,
     /// Windows IP Helper API (`IcmpSendEcho`), unprivileged.
     WindowsApi,
@@ -44,6 +47,7 @@ pub struct IcmpSocket {
 }
 
 impl IcmpSocket {
+    /// Kind of socket in use.
     pub fn kind(&self) -> SocketKind {
         self.kind
     }
@@ -167,9 +171,16 @@ fn strip_ipv4_header(buf: &[u8]) -> &[u8] {
 /// What a received ICMP message means for our request.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Reply {
-    Echo { len: usize },
+    /// Matching echo reply.
+    Echo {
+        /// ICMP message size in bytes.
+        len: usize,
+    },
+    /// Destination unreachable for our request, with the ICMP code.
     Unreachable(u8),
+    /// Time to live exceeded for our request.
     TimeExceeded,
+    /// A message for some other request.
     Unrelated,
 }
 
@@ -253,8 +264,13 @@ fn describe_io(e: &io::Error) -> String {
 /// Result of one echo exchange.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Echo {
-    /// Echo reply received after `rtt`; `bytes` is the ICMP message size.
-    Reply { rtt: Duration, bytes: usize },
+    /// Echo reply received.
+    Reply {
+        /// Round-trip time.
+        rtt: Duration,
+        /// ICMP message size in bytes.
+        bytes: usize,
+    },
     /// No reply before the deadline.
     NoReply,
     /// Unreachable, TTL exceeded, or a local error.
@@ -310,8 +326,14 @@ impl IcmpSocket {
 /// Kind of ICMP message relevant to an echo exchange.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MsgKind {
-    EchoReply { len: usize },
+    /// Echo reply.
+    EchoReply {
+        /// ICMP message size in bytes.
+        len: usize,
+    },
+    /// Destination unreachable, with the ICMP code.
     Unreachable(u8),
+    /// Time to live exceeded in transit.
     TimeExceeded,
 }
 
@@ -319,8 +341,11 @@ pub enum MsgKind {
 /// (for error messages, those of the embedded original echo request).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Parsed {
+    /// What kind of message this is.
     pub kind: MsgKind,
+    /// ICMP identifier of the request concerned.
     pub id: u16,
+    /// ICMP sequence number of the request concerned.
     pub seq: u16,
 }
 
@@ -422,6 +447,7 @@ impl Pinger {
         })
     }
 
+    /// Kind of the shared socket.
     pub fn kind(&self) -> SocketKind {
         self.inner.kind
     }

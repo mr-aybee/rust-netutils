@@ -15,6 +15,7 @@ use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme};
 
+/// The *ring* crypto provider used for all TLS operations.
 pub fn provider() -> Arc<CryptoProvider> {
     Arc::new(rustls::crypto::ring::default_provider())
 }
@@ -66,6 +67,7 @@ pub struct RecordingVerifier {
 }
 
 impl RecordingVerifier {
+    /// Wrap `inner`; the verdict is recorded on the first certificate verification.
     pub fn new(inner: Arc<WebPkiServerVerifier>) -> Arc<Self> {
         Arc::new(Self {
             inner,
@@ -78,6 +80,7 @@ impl RecordingVerifier {
         self.verdict.lock().map(|g| g.clone()).unwrap_or(None)
     }
 
+    /// Client configuration that verifies through this recorder.
     pub fn client_config(self: &Arc<Self>) -> Result<Arc<ClientConfig>, String> {
         let cfg = ClientConfig::builder_with_provider(provider())
             .with_safe_default_protocol_versions()

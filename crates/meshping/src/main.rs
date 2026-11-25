@@ -1,3 +1,5 @@
+//! MeshPing command-line entry point.
+
 use std::io::Write;
 use std::net::IpAddr;
 use std::process::ExitCode;

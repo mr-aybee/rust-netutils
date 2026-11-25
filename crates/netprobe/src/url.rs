@@ -2,10 +2,14 @@
 
 use crate::target::validate_host;
 
+/// A parsed `http://` or `https://` URL.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HttpUrl {
+    /// Whether the scheme is `https`.
     pub tls: bool,
+    /// Host name or IP literal (IPv6 without brackets).
     pub host: String,
+    /// Port, defaulting to 80 or 443.
     pub port: u16,
     /// Path and query, always starting with '/'.
     pub path: String,
@@ -28,6 +32,7 @@ impl HttpUrl {
         }
     }
 
+    /// The URL as displayed in output (fragment removed, default port omitted).
     pub fn display(&self) -> String {
         format!(
             "{}://{}{}",
@@ -38,6 +43,7 @@ impl HttpUrl {
     }
 }
 
+/// Parse an `http://` or `https://` URL; credentials and control characters are rejected.
 pub fn parse_url(input: &str) -> Result<HttpUrl, String> {
     let s = input.trim();
     let (tls, rest) = if let Some(r) = s.strip_prefix("https://") {

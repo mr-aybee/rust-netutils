@@ -24,18 +24,26 @@ use crate::url::{HttpUrl, parse_url};
 
 /// Upper bound on jobs per batch file, to keep memory predictable.
 pub const MAX_JOBS: usize = 100_000;
+/// Maximum length of one batch file line, in bytes.
 pub const MAX_LINE: usize = 4096;
 
+/// One probe parsed from a batch file.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Job {
+    /// TCP connect to an endpoint.
     Tcp(Endpoint),
+    /// HTTP(S) request to a URL.
     Http(HttpUrl),
+    /// DNS query for a name and record type.
     Dns(String, RecordType),
+    /// UDP request/response with an empty payload.
     Udp(Endpoint),
+    /// ICMP echo to a host.
     Icmp(String),
 }
 
 impl Job {
+    /// Label used in output, e.g. `tcp example.com:443`.
     pub fn label(&self) -> String {
         match self {
             Job::Tcp(e) => format!("tcp {e}"),
@@ -118,11 +126,14 @@ pub fn parse_jobs(text: &str) -> Result<Vec<Job>, String> {
 
 /// Shared, lazily built resources.
 pub struct Shared {
+    /// TLS client configuration, present when any job uses HTTPS.
     pub tls: Option<Arc<ClientConfig>>,
+    /// DNS resolver, present when any job is a DNS query.
     pub resolver: Option<TokioResolver>,
 }
 
 impl Shared {
+    /// Build only the resources the given jobs need.
     pub fn for_jobs(
         jobs: &[Job],
         timeout: Duration,
@@ -146,9 +157,13 @@ impl Shared {
 
 /// Outcome for one job.
 pub struct JobOutcome {
+    /// Position of the job in the batch file.
     pub index: usize,
+    /// Job label.
     pub label: String,
+    /// One result per attempt.
     pub results: Vec<ProbeResult>,
+    /// Aggregate over the attempts.
     pub report: Report,
 }
 

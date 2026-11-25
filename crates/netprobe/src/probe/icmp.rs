@@ -18,6 +18,7 @@ pub async fn resolve_ip(host: &str) -> io::Result<IpAddr> {
     Ok(tcp::resolve(&ep).await?[0].ip())
 }
 
+/// Send one echo request and record the outcome.
 pub async fn probe(
     sock: &IcmpSocket,
     host: &str,

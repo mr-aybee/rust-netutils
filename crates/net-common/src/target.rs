@@ -6,7 +6,9 @@ use std::net::IpAddr;
 /// A host (name or IP literal) and port.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Endpoint {
+    /// Host name or IP literal (IPv6 without brackets).
     pub host: String,
+    /// Port number (1-65535).
     pub port: u16,
 }
 

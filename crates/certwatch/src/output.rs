@@ -15,6 +15,7 @@ fn expiry_text(r: &CheckResult) -> Option<String> {
     })
 }
 
+/// Format one result (and, if `verbose`, its full chain) for the terminal.
 pub fn human(r: &CheckResult, verbose: bool) -> String {
     let mut s = format!("{:<8} {}", r.verdict.label(), r.target);
 
@@ -57,17 +58,25 @@ pub fn human(r: &CheckResult, verbose: bool) -> String {
     s
 }
 
+/// Counts of results by verdict.
 #[derive(Debug, Default, Serialize)]
 pub struct Summary {
+    /// Targets checked.
     pub total: usize,
+    /// Results with verdict `ok`.
     pub ok: usize,
+    /// Results with verdict `warning`.
     pub warning: usize,
+    /// Results with verdict `critical`.
     pub critical: usize,
+    /// Results with verdict `error`.
     pub error: usize,
+    /// Whether Ctrl+C stopped the run early.
     pub interrupted: bool,
 }
 
 impl Summary {
+    /// Count verdicts in `results`.
     pub fn from(results: &[CheckResult], interrupted: bool) -> Self {
         let count = |v| results.iter().filter(|r| r.verdict == v).count();
         Summary {
@@ -80,6 +89,7 @@ impl Summary {
         }
     }
 
+    /// One-line human summary.
     pub fn line(&self) -> String {
         format!(
             "--- {} checked: {} ok, {} warning, {} critical, {} error{}",
@@ -104,6 +114,7 @@ struct Doc<'a> {
     summary: &'a Summary,
 }
 
+/// Write the JSON document (`version`, `results`, `summary`) to stdout.
 pub fn write_json(results: &[CheckResult], summary: &Summary) -> io::Result<()> {
     let mut out = io::stdout().lock();
     serde_json::to_writer_pretty(

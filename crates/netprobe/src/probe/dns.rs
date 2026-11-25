@@ -73,6 +73,7 @@ fn describe(e: &NetError) -> String {
     }
 }
 
+/// Query `name`/`rtype` once and record the answers and latency.
 pub async fn probe(
     resolver: &TokioResolver,
     name: &str,

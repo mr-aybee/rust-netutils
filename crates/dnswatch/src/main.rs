@@ -1,3 +1,5 @@
+//! DNSWatch command-line entry point.
+
 use std::io::Write;
 use std::net::{IpAddr, SocketAddr};
 use std::process::ExitCode;

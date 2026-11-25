@@ -10,24 +10,35 @@ const SECS_PER_DAY: i64 = 86_400;
 /// Human- and machine-friendly view of one certificate.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CertInfo {
+    /// Subject distinguished name, e.g. `CN=example.com`.
     pub subject: String,
+    /// Issuer distinguished name.
     pub issuer: String,
     /// DNS names and IP addresses from the Subject Alternative Name extension.
     pub sans: Vec<String>,
+    /// Serial number as colon-separated hex.
     pub serial: String,
+    /// Start of the validity period (ISO 8601, UTC).
     pub not_before: String,
+    /// End of the validity period (ISO 8601, UTC).
     pub not_after: String,
     /// Unix seconds; kept for computation, omitted from JSON.
     #[serde(skip)]
     pub not_after_unix: i64,
+    /// Start of the validity period as Unix seconds; omitted from JSON.
     #[serde(skip)]
     pub not_before_unix: i64,
     /// Whole days until expiry (negative once expired).
     pub days_left: i64,
+    /// Public key type and size, e.g. `EC 256` or `RSA 2048`.
     pub key: String,
+    /// Signature algorithm name, or its OID when unrecognised.
     pub signature_algorithm: String,
+    /// Whether basicConstraints marks this certificate as a CA.
     pub is_ca: bool,
+    /// Whether subject and issuer are identical.
     pub self_signed: bool,
+    /// SHA-256 of the DER encoding as colon-separated upper-case hex.
     pub sha256_fingerprint: String,
 }
 
@@ -118,6 +129,7 @@ pub fn signature_name(oid: &str) -> String {
     .to_string()
 }
 
+/// SHA-256 fingerprint of a DER certificate, formatted `AB:CD:…`.
 pub fn fingerprint(der: &[u8]) -> String {
     let d = ring::digest::digest(&ring::digest::SHA256, der);
     let mut s = String::with_capacity(95);

@@ -13,6 +13,7 @@ use net_common::parse_duration;
     about = "TLS certificate inspection and expiry monitoring",
     propagate_version = true
 )]
+/// Parsed command line.
 pub struct Cli {
     /// Emit a single JSON document on stdout.
     #[arg(long, global = true)]
@@ -23,10 +24,12 @@ pub struct Cli {
     /// Show the full certificate chain.
     #[arg(short, long, global = true)]
     pub verbose: bool,
+    /// Selected subcommand.
     #[command(subcommand)]
     pub command: Command,
 }
 
+/// Available subcommands.
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Connect to TLS endpoints and validate their certificates.
@@ -51,6 +54,7 @@ pub enum Command {
         /// Maximum targets checked concurrently.
         #[arg(short = 'j', long, default_value_t = 20, value_parser = clap::value_parser!(u16).range(1..=1024))]
         concurrency: u16,
+        /// Expiry thresholds.
         #[command(flatten)]
         policy: PolicyArgs,
     },
@@ -59,11 +63,13 @@ pub enum Command {
         /// Certificate files.
         #[arg(required = true)]
         files: Vec<PathBuf>,
+        /// Expiry thresholds.
         #[command(flatten)]
         policy: PolicyArgs,
     },
 }
 
+/// Expiry threshold options shared by `check` and `inspect`.
 #[derive(Debug, Clone, Args)]
 pub struct PolicyArgs {
     /// Warn when a certificate expires within this many days.

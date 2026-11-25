@@ -35,6 +35,7 @@ pub(crate) async fn connect(addrs: &[SocketAddr]) -> std::io::Result<(TcpStream,
     Err(last.unwrap_or_else(|| std::io::Error::other("no addresses")))
 }
 
+/// Resolve and connect once, recording DNS and connect time.
 pub async fn probe(ep: &Endpoint, seq: u32) -> ProbeResult {
     let mut r = ProbeResult::new("tcp", ep.to_string(), seq);
     let start = Instant::now();

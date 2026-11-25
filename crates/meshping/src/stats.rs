@@ -9,29 +9,41 @@ use serde::Serialize;
 pub struct HostStats {
     window: VecDeque<Option<f64>>,
     capacity: usize,
+    /// Probes sent over the whole run.
     pub sent: u64,
+    /// Replies received over the whole run.
     pub received: u64,
+    /// Most recent successful round-trip time.
     pub last_ms: Option<f64>,
 }
 
+/// Point-in-time view of a host's statistics.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Snapshot {
+    /// Probes sent over the whole run.
     pub sent: u64,
+    /// Replies received over the whole run.
     pub received: u64,
     /// Loss over the whole run, percent.
     pub loss_pct: f64,
     /// Loss within the rolling window, percent.
     pub window_loss_pct: f64,
+    /// Most recent successful round-trip time.
     pub last_ms: Option<f64>,
+    /// Lowest round-trip time in the window.
     pub min_ms: Option<f64>,
+    /// Mean round-trip time in the window.
     pub avg_ms: Option<f64>,
+    /// 95th percentile round-trip time in the window (nearest rank).
     pub p95_ms: Option<f64>,
+    /// Highest round-trip time in the window.
     pub max_ms: Option<f64>,
     /// Mean absolute difference between consecutive successful samples (RFC 3550-style jitter, unsmoothed).
     pub jitter_ms: Option<f64>,
 }
 
 impl HostStats {
+    /// Statistics with a rolling window of `window` samples (at least 1).
     pub fn new(window: usize) -> Self {
         let capacity = window.max(1);
         Self {
@@ -59,6 +71,7 @@ impl HostStats {
         self.window.push_back(rtt_ms);
     }
 
+    /// Compute the current statistics.
     pub fn snapshot(&self) -> Snapshot {
         let ok: Vec<f64> = self.window.iter().flatten().copied().collect();
         let mut sorted = ok.clone();
