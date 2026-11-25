@@ -16,7 +16,7 @@ rust-netutils is a collection of single-purpose command-line tools for developer
 
 | Utility | Status | Purpose |
 |---|---|---|
-| [**netprobe**](docs/utilities/netprobe.md) | ✅ 0.1.0 | TCP, DNS, HTTP(S), UDP and ICMP diagnostics with timing breakdowns |
+| [**netprobe**](docs/utilities/netprobe.md) | ✅ 0.2.0 | TCP, DNS, HTTP(S), UDP and ICMP diagnostics with timing breakdowns |
 
 More utilities (TLS certificate monitoring, multi-host latency, socket inspection and others) will be added here only once they are implemented and tested.
 

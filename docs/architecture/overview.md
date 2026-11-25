@@ -26,7 +26,7 @@ flowchart LR
     P --> DNS[dns<br/>hickory-resolver]
     P --> HTTP[http<br/>HTTP/1.1 + rustls]
     P --> UDP[udp]
-    P --> ICMP[icmp<br/>socket2 dgram/raw]
+    P --> ICMP[icmp<br/>socket2 dgram/raw<br/>Windows: IcmpSendEcho]
     RUN --> STATS[stats.rs<br/>min/avg/p50/p95/max]
     MAIN --> OUT[output.rs<br/>human / JSON]
 ```
@@ -40,4 +40,4 @@ flowchart LR
 | Hand-written HTTP/1.1 client instead of hyper/reqwest | The probe needs one request and the response head. A small client gives exact per-phase timing and a smaller dependency tree. |
 | Deadline enforced in the runner; UDP and ICMP enforce their own | A generic deadline turns a hang into "timed out". UDP needs silence to mean *inconclusive*, so it handles its own timeout and the runner allows a grace period. |
 | Three outcomes (`ok` / `failed` / `inconclusive`) and exit code 3 | Prevents reporting UDP silence as either open or closed. |
-| `unsafe_code = "deny"` | Socket setup goes through `socket2`'s safe API. |
+| `unsafe_code = "deny"`, one documented exception | Socket setup goes through `socket2`'s safe API. The only `unsafe` is Windows ICMP FFI (`icmp_windows.rs`), which is the only way to ping on Windows without Administrator rights. |

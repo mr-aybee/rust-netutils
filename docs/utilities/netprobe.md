@@ -172,8 +172,8 @@ icmp 10.0.0.1
 | tcp, dns, http, batch | ✅ | ✅ | ✅ |
 | udp: reply / silence | ✅ | ✅ | ✅ |
 | udp: ICMP port-unreachable detection | ✅ | ✅ (OS-dependent) | ✅ (reported as connection reset) |
-| icmp, unprivileged | ✅ if the group is within `net.ipv4.ping_group_range` | ✅ | ❌ |
-| icmp, privileged | ✅ root or `CAP_NET_RAW` | ✅ root | ✅ Administrator (raw socket) |
+| icmp, unprivileged | ✅ if the group is within `net.ipv4.ping_group_range` | ✅ | ✅ IP Helper API (`IcmpSendEcho`) |
+| icmp, privileged | ✅ root or `CAP_NET_RAW` (raw socket) | ✅ root (raw socket) | not needed |
 
 On Linux, unprivileged ping is enabled with:
 
@@ -181,7 +181,7 @@ On Linux, unprivileged ping is enabled with:
 sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
 ```
 
-**Validation status.** Every feature has been run by hand on Linux x86_64. CI builds and runs the automated test suite on Linux (x86_64, ARM64), Windows (x86_64, ARM64) and macOS (Apple Silicon). macOS x86_64 is cross-compiled in CI but not tested there. ICMP on Windows and macOS has not been verified at runtime.
+**Validation status.** Every feature has been run by hand on Linux x86_64. CI builds and runs the automated test suite on Linux (x86_64, ARM64), Windows (x86_64, ARM64) and macOS (Apple Silicon). macOS x86_64 is cross-compiled in CI but not tested there. On Windows, ICMP through the IP Helper API is exercised by CI tests (loopback echo). ICMP on macOS has not been verified at runtime.
 
 ## Limitations
 
@@ -198,4 +198,5 @@ sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
 - TLS is rustls with the *ring* provider. Trust anchors come from the platform store (`rustls-native-certs`) plus `--ca-file`.
 - DNS uses hickory-resolver with caching disabled and one attempt per query.
 - ICMP sockets are created with `socket2` and driven by Tokio. Echo replies are matched by sequence number (and by identifier on raw sockets), and error messages are matched against the embedded original packet.
-- `unsafe` code is denied across the workspace.
+- `unsafe` code is denied across the workspace, with one exception: `probe/icmp_windows.rs`, a Windows-only FFI module calling `IcmpSendEcho` / `Icmp6SendEcho2`. Every unsafe block documents its safety invariants, handles are closed by an RAII guard, and the module has loopback tests that run in Windows CI.
+- On Windows the blocking IP Helper calls run on Tokio's blocking thread pool, so other jobs and Ctrl+C remain responsive.

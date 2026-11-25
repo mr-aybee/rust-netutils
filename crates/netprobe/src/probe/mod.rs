@@ -3,6 +3,8 @@
 pub mod dns;
 pub mod http;
 pub mod icmp;
+#[cfg(windows)]
+mod icmp_windows;
 pub mod tcp;
 pub mod udp;
 

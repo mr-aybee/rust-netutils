@@ -362,3 +362,14 @@ fn batch_rejects_bad_file() {
         .assert()
         .code(2);
 }
+
+/// Windows uses the unprivileged IP Helper API, so ICMP must work without elevation.
+#[cfg(windows)]
+#[test]
+fn windows_icmp_unprivileged() {
+    netprobe()
+        .args(["icmp", "127.0.0.1", "-c", "2", "-i", "100ms"])
+        .assert()
+        .code(0)
+        .stdout(predicate::str::contains("2 ok"));
+}

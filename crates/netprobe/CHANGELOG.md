@@ -4,6 +4,11 @@ All notable changes to this crate are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the crate uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-11-25
+
+### Added
+- Windows: unprivileged ICMP via the IP Helper API (`IcmpSendEcho` for IPv4, `Icmp6SendEcho2` for IPv6). Administrator rights are no longer required.
+
 ## [0.1.0] - 2026-11-25
 
 ### Added

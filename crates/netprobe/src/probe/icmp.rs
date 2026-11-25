@@ -32,11 +32,14 @@ pub const PAYLOAD_LEN: usize = 32;
 pub enum SocketKind {
     Datagram,
     Raw,
+    /// Windows IP Helper API (`IcmpSendEcho`), unprivileged.
+    WindowsApi,
 }
 
 /// An open ICMP socket for one address family.
 pub struct IcmpSocket {
-    sock: UdpSocket,
+    /// `None` for the Windows API backend, which is not socket-based.
+    sock: Option<UdpSocket>,
     kind: SocketKind,
     v6: bool,
 }
@@ -47,7 +50,23 @@ impl IcmpSocket {
     }
 
     /// Open a datagram socket, falling back to raw if datagram ICMP is not permitted.
+    /// On Windows the unprivileged IP Helper API is used instead.
     pub fn open(v6: bool) -> Result<Self, String> {
+        #[cfg(windows)]
+        {
+            super::icmp_windows::available(v6)?;
+            return Ok(Self {
+                sock: None,
+                kind: SocketKind::WindowsApi,
+                v6,
+            });
+        }
+        #[cfg(not(windows))]
+        Self::open_socket(v6)
+    }
+
+    #[cfg_attr(windows, allow(dead_code))]
+    fn open_socket(v6: bool) -> Result<Self, String> {
         let (domain, proto) = if v6 {
             (Domain::IPV6, Protocol::ICMPV6)
         } else {
@@ -62,7 +81,7 @@ impl IcmpSocket {
         let dgram_err = match attempt(Type::DGRAM) {
             Ok(sock) => {
                 return Ok(Self {
-                    sock,
+                    sock: Some(sock),
                     kind: SocketKind::Datagram,
                     v6,
                 });
@@ -71,7 +90,7 @@ impl IcmpSocket {
         };
         match attempt(Type::RAW) {
             Ok(sock) => Ok(Self {
-                sock,
+                sock: Some(sock),
                 kind: SocketKind::Raw,
                 v6,
             }),
@@ -223,18 +242,21 @@ pub async fn probe(
 ) -> ProbeResult {
     let mut r = ProbeResult::new("icmp", host.to_string(), seq);
     r.address = Some(SocketAddr::new(ip, 0));
+    let Some(socket) = sock.sock.as_ref() else {
+        return probe_windows_api(r, ip, wait).await;
+    };
     let wire_seq = (seq & 0xffff) as u16;
     let packet = build_echo(sock.v6, id, wire_seq);
     let start = Instant::now();
     let deadline = start + wait;
     let dest: SocketAddr = SocketAddr::new(ip, 0);
-    if let Err(e) = sock.sock.send_to(&packet, dest).await {
+    if let Err(e) = socket.send_to(&packet, dest).await {
         r.error = Some(format!("send failed: {}", describe_io(&e)));
         return r;
     }
     let mut buf = [0u8; 1500];
     loop {
-        let recv = tokio::time::timeout_at(deadline.into(), sock.sock.recv_from(&mut buf)).await;
+        let recv = tokio::time::timeout_at(deadline.into(), socket.recv_from(&mut buf)).await;
         let (n, _from) = match recv {
             Err(_) => {
                 r.error = Some("no echo reply".into());
@@ -270,6 +292,32 @@ pub async fn probe(
         }
     }
     r.elapsed_ms = ms(start.elapsed());
+    r
+}
+
+#[cfg(windows)]
+async fn probe_windows_api(mut r: ProbeResult, ip: IpAddr, wait: Duration) -> ProbeResult {
+    use super::icmp_windows::{Echo, echo};
+    let payload = build_echo(false, 0, 0)[8..].to_vec();
+    let start = Instant::now();
+    // IcmpSendEcho blocks; run it on the blocking pool so cancellation and other tasks proceed.
+    let res = tokio::task::spawn_blocking(move || echo(ip, &payload, wait)).await;
+    r.elapsed_ms = ms(start.elapsed());
+    match res {
+        Ok(Echo::Reply { bytes }) => {
+            r.outcome = Outcome::Ok;
+            r.detail = Some(format!("{bytes} bytes"));
+        }
+        Ok(Echo::TimedOut) => r.error = Some("no echo reply".into()),
+        Ok(Echo::Error(e)) => r.error = Some(e),
+        Err(e) => r.error = Some(format!("internal error: {e}")),
+    }
+    r
+}
+
+#[cfg(not(windows))]
+async fn probe_windows_api(mut r: ProbeResult, _ip: IpAddr, _wait: Duration) -> ProbeResult {
+    r.error = Some("internal error: ICMP socket missing".into());
     r
 }
 
