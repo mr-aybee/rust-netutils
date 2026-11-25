@@ -45,13 +45,16 @@ impl HostStats {
     /// Record one probe: `Some(rtt_ms)` for a reply, `None` for loss.
     pub fn record(&mut self, rtt_ms: Option<f64>) {
         self.sent += 1;
+
         if let Some(r) = rtt_ms {
             self.received += 1;
             self.last_ms = Some(r);
         }
+
         if self.window.len() == self.capacity {
             self.window.pop_front();
         }
+
         self.window.push_back(rtt_ms);
     }
 
@@ -96,12 +99,15 @@ mod tests {
     #[test]
     fn window_is_bounded_and_loss_counted() {
         let mut s = HostStats::new(3);
+
         for r in [Some(1.0), None, Some(3.0), Some(5.0)] {
             s.record(r);
         }
+
         let snap = s.snapshot();
         assert_eq!((snap.sent, snap.received), (4, 3));
         assert_eq!(snap.loss_pct, 25.0);
+
         // Window holds [None, 3, 5].
         assert!((snap.window_loss_pct - 100.0 / 3.0).abs() < 1e-9);
         assert_eq!(
@@ -130,8 +136,10 @@ mod tests {
             let mut s = HostStats::new(w);
             for x in &samples { s.record(*x); }
             let snap = s.snapshot();
+
             proptest::prop_assert_eq!(snap.sent, samples.len() as u64);
             proptest::prop_assert!(snap.loss_pct >= 0.0 && snap.loss_pct <= 100.0);
+
             if let (Some(min), Some(p95), Some(max)) = (snap.min_ms, snap.p95_ms, snap.max_ms) {
                 proptest::prop_assert!(min <= p95 && p95 <= max);
             }

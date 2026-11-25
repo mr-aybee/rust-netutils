@@ -57,6 +57,7 @@ pub fn client_config(ca_file: Option<&Path>, insecure: bool) -> Result<Arc<Clien
     let builder = ClientConfig::builder_with_provider(provider())
         .with_safe_default_protocol_versions()
         .map_err(|e| format!("TLS configuration error: {e}"))?;
+
     let config = if insecure {
         builder
             .dangerous()
@@ -68,14 +69,17 @@ pub fn client_config(ca_file: Option<&Path>, insecure: bool) -> Result<Arc<Clien
         let mut roots = RootCertStore::empty();
         let native = rustls_native_certs::load_native_certs();
         roots.add_parsable_certificates(native.certs);
+
         if let Some(path) = ca_file {
             let certs: Vec<CertificateDer<'static>> = CertificateDer::pem_file_iter(path)
                 .map_err(|e| format!("cannot read CA file {}: {e}", path.display()))?
                 .collect::<Result<_, _>>()
                 .map_err(|e| format!("invalid PEM in {}: {e}", path.display()))?;
+
             if certs.is_empty() {
                 return Err(format!("no certificates found in {}", path.display()));
             }
+
             let (_, bad) = roots.add_parsable_certificates(certs);
             if bad > 0 {
                 return Err(format!(
@@ -84,11 +88,14 @@ pub fn client_config(ca_file: Option<&Path>, insecure: bool) -> Result<Arc<Clien
                 ));
             }
         }
+
         if roots.is_empty() {
             return Err("no trusted root certificates found on this system; use --ca-file".into());
         }
+
         builder.with_root_certificates(roots).with_no_client_auth()
     };
+
     Ok(Arc::new(config))
 }
 
@@ -152,6 +159,7 @@ pub fn parse_status_line(head: &[u8]) -> Result<StatusLine, String> {
             truncate(line, 60)
         ));
     }
+
     let code = parts
         .next()
         .filter(|c| c.len() == 3)
@@ -190,6 +198,7 @@ async fn exchange<S: AsyncRead + AsyncWrite + Unpin>(
     let mut head = Vec::with_capacity(1024);
     let mut buf = [0u8; 4096];
     let mut ttfb = None;
+
     loop {
         let n = stream.read(&mut buf).await?;
         if n == 0 {
@@ -199,16 +208,21 @@ async fn exchange<S: AsyncRead + AsyncWrite + Unpin>(
                     "connection closed before response",
                 ));
             }
+
             break;
         }
+
         ttfb.get_or_insert_with(|| sent.elapsed());
+
         // Only rescan the overlap region for the terminator.
         let scan_from = head.len().saturating_sub(3);
         head.extend_from_slice(&buf[..n]);
+
         if let Some(pos) = head[scan_from..].windows(4).position(|w| w == b"\r\n\r\n") {
             head.truncate(scan_from + pos + 4);
             break;
         }
+
         if head.len() > MAX_HEAD {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -216,6 +230,7 @@ async fn exchange<S: AsyncRead + AsyncWrite + Unpin>(
             ));
         }
     }
+
     Ok((head, ttfb.unwrap_or_default()))
 }
 
@@ -243,6 +258,7 @@ pub async fn probe(
         r.outcome = Outcome::Failed;
         r.error = Some(e);
     }
+
     r.elapsed_ms = ms(start.elapsed());
     r
 }
@@ -295,6 +311,7 @@ async fn run(
             .map_err(|e| describe_io(&e))?;
         (h, ttfb, None)
     };
+
     r.timings.first_byte_ms = Some(ms(ttfb));
 
     let status = parse_status_line(&head)?;
@@ -302,20 +319,25 @@ async fn run(
     let mut detail = format!("HTTP {} {}", status.code, status.reason)
         .trim_end()
         .to_string();
+
     if let Some(v) = tls_info {
         detail.push_str(&format!(" tls={}", v.replace("TLSv1_", "1.")));
     }
+
     if (300..400).contains(&status.code)
         && let Some(loc) = header(&head_str, "location")
     {
         detail.push_str(&format!(" location={}", truncate(loc, 200)));
     }
+
     r.detail = Some(detail);
+
     let accepted = if opts.expect.is_empty() {
         (200..400).contains(&status.code)
     } else {
         opts.expect.contains(&status.code)
     };
+
     if accepted {
         r.outcome = Outcome::Ok;
         Ok(())
@@ -349,6 +371,7 @@ mod tests {
             }
         );
         assert_eq!(parse_status_line(b"HTTP/1.0 404\r\n").unwrap().code, 404);
+
         for bad in [
             &b"SSH-2.0-OpenSSH\r\n"[..],
             b"HTTP/1.1 20 OK",

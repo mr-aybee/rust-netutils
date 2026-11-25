@@ -39,6 +39,7 @@ fn main() {
     let config = Arc::new(config);
     let listener = TcpListener::bind(&addr).unwrap();
     eprintln!("tls_server listening on {}", listener.local_addr().unwrap());
+
     for conn in listener.incoming() {
         let Ok(mut tcp) = conn else { continue };
         let config = Arc::clone(&config);
@@ -46,9 +47,11 @@ fn main() {
             let Ok(mut c) = rustls::ServerConnection::new(config) else {
                 return;
             };
+
             let mut tls = rustls::Stream::new(&mut c, &mut tcp);
             let mut buf = [0u8; 64];
             let _ = tls.read(&mut buf);
+
             // Close cleanly so clients (e.g. openssl) do not report an unexpected EOF.
             tls.conn.send_close_notify();
             let _ = tls.flush();

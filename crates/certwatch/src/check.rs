@@ -104,6 +104,7 @@ pub fn evaluate(
     let mut problems = Vec::new();
     let mut verdict = Verdict::Ok;
     let leaf_days = chain.first().map(|c| c.days_left);
+
     // The root is not normally sent; if a self-signed CA is in the chain, ignore it for expiry.
     let chain_days = chain
         .iter()
@@ -115,12 +116,14 @@ pub fn evaluate(
         problems.push(msg.clone());
         verdict = verdict.max(Verdict::Critical);
     }
+
     if let Some(days) = chain_days {
         let which = if chain_days == leaf_days {
             "certificate"
         } else {
             "a certificate in the chain"
         };
+
         if days < 0 {
             problems.push(format!("{which} expired {} day(s) ago", -days));
             verdict = verdict.max(Verdict::Critical);
@@ -138,9 +141,11 @@ pub fn evaluate(
             verdict = verdict.max(Verdict::Warning);
         }
     }
+
     if let Some(leaf) = chain.first() {
         problems.extend(cert::weaknesses(leaf));
     }
+
     // Problems are deduplicated so an expired leaf is not reported twice.
     problems.dedup();
     (verdict, problems, leaf_days, chain_days)
@@ -156,6 +161,7 @@ pub async fn check(
 ) -> CheckResult {
     let start = Instant::now();
     let target = ep.to_string();
+
     match tokio::time::timeout(deadline, check_inner(ep, sni, verifier, policy, start)).await {
         Ok(r) => r,
         Err(_) => CheckResult::error(
@@ -182,12 +188,15 @@ async fn check_inner(
     start: Instant,
 ) -> CheckResult {
     let target = ep.to_string();
+
     let addrs: Vec<SocketAddr> = match lookup_host((ep.host.as_str(), ep.port)).await {
         Ok(a) => a.collect(),
         Err(e) => return CheckResult::error(target, format!("resolve failed: {e}"), start),
     };
+
     let mut last_err = None;
     let mut conn = None;
+
     for addr in &addrs {
         match TcpStream::connect(addr).await {
             Ok(s) => {
@@ -197,6 +206,7 @@ async fn check_inner(
             Err(e) => last_err = Some(e),
         }
     }
+
     let Some((stream, addr)) = conn else {
         let msg = last_err.map_or_else(
             || "no addresses found".to_string(),
@@ -216,11 +226,13 @@ async fn check_inner(
             );
         }
     };
+
     let recorder = RecordingVerifier::new(Arc::clone(verifier));
     let config = match recorder.client_config() {
         Ok(c) => c,
         Err(e) => return CheckResult::error(target, e, start),
     };
+
     let tls = match tokio_rustls::TlsConnector::from(config)
         .connect(server_name, stream)
         .await
@@ -230,9 +242,11 @@ async fn check_inner(
             let mut r = CheckResult::error(target, format!("TLS handshake failed: {e}"), start);
             r.address = Some(addr);
             r.sni = Some(name_str);
+
             return r;
         }
     };
+
     let (_, session) = tls.get_ref();
     let tls_version = session
         .protocol_version()
@@ -240,12 +254,14 @@ async fn check_inner(
     let now = now_unix();
     let mut chain = Vec::new();
     let mut parse_errors = Vec::new();
+
     for der in session.peer_certificates().unwrap_or_default() {
         match cert::parse(der, now) {
             Ok(c) => chain.push(c),
             Err(e) => parse_errors.push(e),
         }
     }
+
     // Close without sending application data.
     drop(tls);
 
@@ -254,6 +270,7 @@ async fn check_inner(
         Some(Err(e)) => Some(classify(&e)),
         None => Some(("invalid", "server presented no certificate".to_string())),
     };
+
     let kind = validation.as_ref().map(|(k, _)| *k);
     let (verdict, mut problems, days_left, chain_days_left) = evaluate(&chain, validation, policy);
     problems.extend(parse_errors);

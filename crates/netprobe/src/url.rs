@@ -19,6 +19,7 @@ impl HttpUrl {
         } else {
             self.host.clone()
         };
+
         let default = if self.tls { 443 } else { 80 };
         if self.port == default {
             h
@@ -48,6 +49,7 @@ pub fn parse_url(input: &str) -> Result<HttpUrl, String> {
             "invalid URL '{input}': scheme must be http:// or https://"
         ));
     };
+
     // Fragments are never sent to the server.
     let rest = rest.split('#').next().unwrap_or_default();
     let (authority, path) = match rest.find(['/', '?']) {
@@ -55,16 +57,19 @@ pub fn parse_url(input: &str) -> Result<HttpUrl, String> {
         Some(i) => (&rest[..i], rest[i..].to_string()),
         None => (rest, "/".to_string()),
     };
+
     if authority.contains('@') {
         return Err(format!(
             "invalid URL '{input}': credentials in URLs are not supported"
         ));
     }
+
     if path.bytes().any(|b| b <= b' ' || b == 0x7f) {
         return Err(format!(
             "invalid URL '{input}': path contains whitespace or control characters"
         ));
     }
+
     let default_port = if tls { 443 } else { 80 };
     let ep = crate::target::parse_endpoint(authority, Some(default_port))
         .map_err(|e| format!("invalid URL '{input}': {e}"))?;

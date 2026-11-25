@@ -21,6 +21,7 @@ pub fn parse_type(s: &str) -> Result<RecordType, String> {
             SUPPORTED.join(", ")
         ));
     }
+
     RecordType::from_str(&up).map_err(|e| e.to_string())
 }
 
@@ -56,6 +57,7 @@ impl Answer {
     /// Values of the requested type only (drops CNAMEs followed on the way).
     pub fn values_of(&self, rtype: RecordType) -> Vec<String> {
         let prefix = format!("{rtype} ");
+
         match self {
             Answer::Records(r) => r
                 .iter()
@@ -69,16 +71,19 @@ impl Answer {
 /// Records added and removed between two record sets.
 pub fn diff(old: &Answer, new: &Answer) -> (Vec<String>, Vec<String>) {
     let empty = Vec::new();
+
     let o = if let Answer::Records(r) = old {
         r
     } else {
         &empty
     };
+
     let n = if let Answer::Records(r) = new {
         r
     } else {
         &empty
     };
+
     let added = n.iter().filter(|x| !o.contains(x)).cloned().collect();
     let removed = o.iter().filter(|x| !n.contains(x)).cloned().collect();
     (added, removed)
@@ -92,17 +97,20 @@ pub struct Source {
 
 pub fn build_source(server: Option<SocketAddr>, timeout: Duration) -> Result<Source, String> {
     let provider = TokioRuntimeProvider::default();
+
     let (label, mut builder) = match server {
         Some(addr) => {
             let mut ns = NameServerConfig::udp_and_tcp(addr.ip());
             for c in &mut ns.connections {
                 c.port = addr.port();
             }
+
             let label = if addr.port() == 53 {
                 addr.ip().to_string()
             } else {
                 addr.to_string()
             };
+
             (
                 label,
                 TokioResolver::builder_with_config(
@@ -117,6 +125,7 @@ pub fn build_source(server: Option<SocketAddr>, timeout: Duration) -> Result<Sou
                 .map_err(|e| format!("cannot read system DNS configuration: {e}"))?,
         ),
     };
+
     let opts = builder.options_mut();
     opts.cache_size = 0;
     opts.attempts = 1;
@@ -137,6 +146,7 @@ pub async fn query(resolver: &TokioResolver, name: &str, rtype: RecordType) -> A
                 .collect();
             recs.sort_unstable();
             recs.dedup();
+
             if recs.is_empty() {
                 Answer::Nodata
             } else {

@@ -54,6 +54,7 @@ impl Prober {
             },
             Prober::Tcp { port } => {
                 let start = Instant::now();
+
                 match tokio::time::timeout(timeout, TcpStream::connect(SocketAddr::new(ip, *port)))
                     .await
                 {

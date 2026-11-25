@@ -36,19 +36,23 @@ pub async fn poll(
             (i, query(&s.resolver, &q.name, q.rtype).await)
         });
     };
+
     while next < total.min(concurrency.max(1)) {
         spawn(&mut set, next);
         next += 1;
     }
+
     while let Some(res) = set.join_next().await {
         if let Ok((i, a)) = res {
             out[i] = Some(a);
         }
+
         if next < total {
             spawn(&mut set, next);
             next += 1;
         }
     }
+
     out.into_iter()
         .map(|a| a.unwrap_or_else(|| Answer::Error("internal task failure".into())))
         .collect()
@@ -90,10 +94,12 @@ pub fn emit(e: &Event<'_>, json: bool) {
             Kind::Error => "ERROR",
             Kind::Recovered => "RECOVERED",
         };
+
         let mut s = format!(
             "{}  {label:<9} {} {} @{}  ",
             e.time, e.name, e.rtype, e.server
         );
+
         if e.event == Kind::Changed && (!e.added.is_empty() || !e.removed.is_empty()) {
             let parts: Vec<String> = e
                 .added
@@ -107,8 +113,10 @@ pub fn emit(e: &Event<'_>, json: bool) {
         } else {
             s.push_str(&e.answer.summary());
         }
+
         s
     };
+
     let _ = writeln!(std::io::stdout().lock(), "{line}");
 }
 
@@ -132,10 +140,12 @@ pub async fn watch(
     let mut ticker = tokio::time::interval(s.interval);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut changed_any = false;
+
     loop {
         ticker.tick().await;
         let answers = poll(&sources, &queries, s.concurrency).await;
         let time = iso8601(now_unix());
+
         for (i, ans) in answers.iter().enumerate() {
             let q = &queries[i / sources.len()];
             let src = &sources[i % sources.len()].label;
@@ -150,16 +160,20 @@ pub async fn watch(
                 added,
                 removed,
             };
+
             if !ans.is_definitive() {
                 // Report each failure streak once; never treat it as a change.
                 if !failing.insert(i, true).unwrap_or(false) {
                     emit(&base(Kind::Error, last.get(&i), vec![], vec![]), s.json);
                 }
+
                 continue;
             }
+
             if failing.remove(&i).unwrap_or(false) && last.get(&i) == Some(ans) {
                 emit(&base(Kind::Recovered, None, vec![], vec![]), s.json);
             }
+
             match last.get(&i) {
                 None => {
                     if !quiet_initial {
@@ -173,8 +187,10 @@ pub async fn watch(
                 }
                 Some(_) => {}
             }
+
             last.insert(i, ans.clone());
         }
+
         if until_change && changed_any {
             return true;
         }
@@ -196,11 +212,13 @@ pub async fn wait(
     want.dedup();
     let mut ticker = tokio::time::interval(s.interval);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
     loop {
         ticker.tick().await;
         let answers = poll(&sources, &queries, s.concurrency).await;
         let mut matched = 0;
         let mut pending = Vec::new();
+
         for (i, ans) in answers.iter().enumerate() {
             let q = &queries[i / sources.len()];
             let mut got: Vec<String> = ans
@@ -210,6 +228,7 @@ pub async fn wait(
                 .collect();
             got.sort_unstable();
             got.dedup();
+
             if got == want {
                 matched += 1;
             } else {
@@ -222,7 +241,9 @@ pub async fn wait(
                 ));
             }
         }
+
         let time = iso8601(now_unix());
+
         if s.json {
             let doc = serde_json::json!({"time": time, "matched": matched, "total": answers.len(), "pending": pending});
             let _ = writeln!(std::io::stdout().lock(), "{doc}");
@@ -238,6 +259,7 @@ pub async fn wait(
                 }
             );
         }
+
         if matched == answers.len() {
             return true;
         }

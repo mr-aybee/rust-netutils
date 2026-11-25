@@ -76,19 +76,25 @@ pub struct Scope {
 
 fn flags(scope: Scope) -> (AddressFamilyFlags, ProtocolFlags) {
     let mut af = AddressFamilyFlags::empty();
+
     if scope.ipv4 {
         af |= AddressFamilyFlags::IPV4;
     }
+
     if scope.ipv6 {
         af |= AddressFamilyFlags::IPV6;
     }
+
     let mut pf = ProtocolFlags::empty();
+
     if scope.tcp {
         pf |= ProtocolFlags::TCP;
     }
+
     if scope.udp {
         pf |= ProtocolFlags::UDP;
     }
+
     (af, pf)
 }
 
@@ -100,6 +106,7 @@ fn to_sock(
     let process = pids
         .first()
         .and_then(|p| names.entry(*p).or_insert_with(|| process_name(*p)).clone());
+
     match info {
         ProtocolSocketInfo::Tcp(t) => Sock {
             proto: Proto::Tcp,
@@ -154,6 +161,7 @@ impl Snapshotter {
             .map_err(|e| format!("cannot read socket table: {e}"))?
             .collect::<Result<_, _>>()
             .map_err(|e| format!("cannot read socket table: {e}"))?;
+
         // Inode 0 means no owning file (e.g. TIME_WAIT); nothing to resolve.
         let live: std::collections::HashSet<u32> =
             raw.iter().map(|s| s.inode).filter(|i| *i != 0).collect();
@@ -162,15 +170,18 @@ impl Snapshotter {
             .copied()
             .filter(|i| !self.owners.contains_key(i))
             .collect();
+
         if !missing.is_empty() {
             self.proc_scans += 1;
             let found = scan_proc_for_inodes(&missing);
+
             for inode in missing {
                 // Remember unresolvable inodes too, so they don't trigger a rescan every poll.
                 self.owners
                     .insert(inode, found.get(&inode).cloned().unwrap_or_default());
             }
         }
+
         self.owners.retain(|i, _| live.contains(i));
         let mut out: Vec<Sock> = raw
             .into_iter()
@@ -206,20 +217,25 @@ impl Snapshotter {
 #[cfg(target_os = "linux")]
 fn scan_proc_for_inodes(wanted: &std::collections::HashSet<u32>) -> HashMap<u32, Vec<u32>> {
     let mut map: HashMap<u32, Vec<u32>> = HashMap::new();
+
     let Ok(procs) = std::fs::read_dir("/proc") else {
         return map;
     };
+
     for p in procs.flatten() {
         let Some(pid) = p.file_name().to_str().and_then(|n| n.parse::<u32>().ok()) else {
             continue;
         };
+
         let Ok(fds) = std::fs::read_dir(p.path().join("fd")) else {
             continue;
         };
+
         for fd in fds.flatten() {
             let Ok(target) = std::fs::read_link(fd.path()) else {
                 continue;
             };
+
             let Some(inode) = target
                 .to_str()
                 .and_then(|t| t.strip_prefix("socket:["))
@@ -228,6 +244,7 @@ fn scan_proc_for_inodes(wanted: &std::collections::HashSet<u32>) -> HashMap<u32,
             else {
                 continue;
             };
+
             if wanted.contains(&inode) {
                 let e = map.entry(inode).or_default();
                 if !e.contains(&pid) {
@@ -236,9 +253,11 @@ fn scan_proc_for_inodes(wanted: &std::collections::HashSet<u32>) -> HashMap<u32,
             }
         }
     }
+
     for v in map.values_mut() {
         v.sort_unstable();
     }
+
     map
 }
 
@@ -266,6 +285,7 @@ pub struct Filter {
 impl Filter {
     pub fn matches(&self, s: &Sock) -> bool {
         let remote_port = s.remote.map(|r| r.port());
+
         if !self.ports.is_empty()
             && !self
                 .ports
@@ -274,12 +294,15 @@ impl Filter {
         {
             return false;
         }
+
         if !self.local_ports.is_empty() && !self.local_ports.contains(&s.local.port()) {
             return false;
         }
+
         if !self.pids.is_empty() && !s.pids.iter().any(|p| self.pids.contains(p)) {
             return false;
         }
+
         if !self.states.is_empty()
             && !s
                 .state
@@ -288,9 +311,11 @@ impl Filter {
         {
             return false;
         }
+
         if self.listening && !(s.proto == Proto::Udp || s.state.as_deref() == Some("LISTEN")) {
             return false;
         }
+
         if let Some(name) = &self.process
             && !s
                 .process
@@ -299,12 +324,14 @@ impl Filter {
         {
             return false;
         }
+
         if let Some(ip) = self.address
             && s.local.ip() != ip
             && s.remote.map(|r| r.ip()) != Some(ip)
         {
             return false;
         }
+
         true
     }
 }
@@ -322,6 +349,7 @@ pub fn diff(old: &[Sock], new: &[Sock]) -> Vec<Change> {
     let o: BTreeMap<Key, &Sock> = old.iter().map(|s| (s.key(), s)).collect();
     let n: BTreeMap<Key, &Sock> = new.iter().map(|s| (s.key(), s)).collect();
     let mut out = Vec::new();
+
     for (k, s) in &o {
         if !n.contains_key(k) {
             out.push(Change::Closed {
@@ -329,6 +357,7 @@ pub fn diff(old: &[Sock], new: &[Sock]) -> Vec<Change> {
             });
         }
     }
+
     for (k, s) in &n {
         match o.get(k) {
             None => out.push(Change::Opened {
@@ -341,6 +370,7 @@ pub fn diff(old: &[Sock], new: &[Sock]) -> Vec<Change> {
             Some(_) => {}
         }
     }
+
     out
 }
 
@@ -469,6 +499,7 @@ mod tests {
                 .any(|s| s.local.port() == port && s.pids.contains(&std::process::id()))
         );
         assert!(snap.proc_scans >= 1);
+
         // The listener's owner is now cached: later snapshots still report it,
         // and each scan only happens because some *other* new socket appeared.
         for _ in 0..3 {

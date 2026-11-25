@@ -48,15 +48,19 @@ impl Job {
 /// Parse a batch file. Errors carry the 1-based line number.
 pub fn parse_jobs(text: &str) -> Result<Vec<Job>, String> {
     let mut jobs = Vec::new();
+
     for (i, raw) in text.lines().enumerate() {
         let n = i + 1;
+
         if raw.len() > MAX_LINE {
             return Err(format!("line {n}: longer than {MAX_LINE} bytes"));
         }
+
         let line = raw.split('#').next().unwrap_or_default().trim();
         if line.is_empty() {
             continue;
         }
+
         let mut parts = line.split_whitespace();
         let kind = parts.next().unwrap_or_default();
         let arg = parts
@@ -79,9 +83,11 @@ pub fn parse_jobs(text: &str) -> Result<Vec<Job>, String> {
                 validate_host(arg).map_err(|e| format!("line {n}: invalid name '{arg}': {e}"))?;
                 let rt = dns::parse_record_type(t.unwrap_or("A"))
                     .map_err(|e| format!("line {n}: {e}"))?;
+
                 if parts.next().is_some() {
                     return Err(format!("line {n}: too many fields"));
                 }
+
                 Job::Dns(arg.to_string(), rt)
             }
             ("tcp" | "udp" | "http" | "icmp", Some(_)) => {
@@ -93,14 +99,18 @@ pub fn parse_jobs(text: &str) -> Result<Vec<Job>, String> {
                 ));
             }
         };
+
         jobs.push(job);
+
         if jobs.len() > MAX_JOBS {
             return Err(format!("more than {MAX_JOBS} jobs"));
         }
     }
+
     if jobs.is_empty() {
         return Err("batch file contains no jobs".into());
     }
+
     Ok(jobs)
 }
 
@@ -121,11 +131,13 @@ impl Shared {
         } else {
             None
         };
+
         let resolver = if jobs.iter().any(|j| matches!(j, Job::Dns(..))) {
             Some(dns::build_resolver(None, timeout)?)
         } else {
             None
         };
+
         Ok(Self { tls, resolver })
     }
 }
@@ -142,6 +154,7 @@ async fn run_job(job: Job, plan: Plan, shared: Arc<Shared>) -> (String, Vec<Prob
     let label = job.label();
     let never = std::future::pending::<()>();
     let quiet = |_: &ProbeResult| {};
+
     let (results, _) = match &job {
         Job::Tcp(ep) => runner::run(plan, "tcp", &label, |s| tcp::probe(ep, s), never, quiet).await,
         Job::Udp(ep) => {
@@ -197,6 +210,7 @@ async fn run_job(job: Job, plan: Plan, shared: Arc<Shared>) -> (String, Vec<Prob
                     grace: Duration::from_secs(1),
                     ..plan
                 };
+
                 // Each job owns its socket, so concurrent jobs cannot consume each other's replies.
                 let id = (std::process::id() & 0xffff) as u16;
                 runner::run(
@@ -212,6 +226,7 @@ async fn run_job(job: Job, plan: Plan, shared: Arc<Shared>) -> (String, Vec<Prob
             Err(e) => (vec![setup_failure("icmp", &label, &e)], false),
         },
     };
+
     (label, results)
 }
 
@@ -279,6 +294,7 @@ where
             () = &mut cancel => {
                 interrupted = true;
                 set.abort_all();
+
                 break;
             }
         }

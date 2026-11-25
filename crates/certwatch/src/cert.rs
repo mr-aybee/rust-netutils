@@ -39,6 +39,7 @@ pub fn parse(der: &[u8], now: i64) -> Result<CertInfo, String> {
     let not_after_unix = validity.not_after.timestamp();
     let not_before_unix = validity.not_before.timestamp();
     let mut sans = Vec::new();
+
     if let Ok(Some(ext)) = cert.subject_alternative_name() {
         for name in &ext.value.general_names {
             match name {
@@ -48,6 +49,7 @@ pub fn parse(der: &[u8], now: i64) -> Result<CertInfo, String> {
             }
         }
     }
+
     let subject = cert.subject().to_string();
     let issuer = cert.issuer().to_string();
     Ok(CertInfo {
@@ -119,12 +121,15 @@ pub fn signature_name(oid: &str) -> String {
 pub fn fingerprint(der: &[u8]) -> String {
     let d = ring::digest::digest(&ring::digest::SHA256, der);
     let mut s = String::with_capacity(95);
+
     for (i, b) in d.as_ref().iter().enumerate() {
         if i > 0 {
             s.push(':');
         }
+
         s.push_str(&format!("{b:02X}"));
     }
+
     s
 }
 
@@ -133,6 +138,7 @@ pub use net_common::time::iso8601;
 /// Problems worth flagging regardless of trust status.
 pub fn weaknesses(c: &CertInfo) -> Vec<String> {
     let mut out = Vec::new();
+
     // A self-signed certificate's own signature is never verified, so its algorithm is irrelevant.
     if !c.self_signed
         && (c.signature_algorithm.contains("sha1") || c.signature_algorithm.contains("SHA1"))
@@ -142,6 +148,7 @@ pub fn weaknesses(c: &CertInfo) -> Vec<String> {
             c.signature_algorithm
         ));
     }
+
     if let Some(bits) = c
         .key
         .strip_prefix("RSA ")
@@ -150,6 +157,7 @@ pub fn weaknesses(c: &CertInfo) -> Vec<String> {
     {
         out.push(format!("weak RSA key ({bits} bits)"));
     }
+
     out
 }
 

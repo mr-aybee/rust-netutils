@@ -28,6 +28,7 @@ fn serve(response: Option<&'static [u8]>, connections: usize) -> SocketAddr {
     thread::spawn(move || {
         for s in l.incoming().take(connections) {
             let Ok(mut s) = s else { continue };
+
             if let Some(resp) = response {
                 let mut buf = [0u8; 2048];
                 let _ = s.read(&mut buf);
@@ -182,9 +183,11 @@ mod tls {
         thread::spawn(move || {
             for s in l.incoming().take(4) {
                 let Ok(mut tcp) = s else { continue };
+
                 let Ok(mut conn) = rustls::ServerConnection::new(Arc::clone(&config)) else {
                     continue;
                 };
+
                 let mut tls = rustls::Stream::new(&mut conn, &mut tcp);
                 let mut buf = [0u8; 2048];
                 if tls.read(&mut buf).is_ok() {
@@ -203,12 +206,14 @@ fn https_trust_is_enforced() {
     std::fs::create_dir_all(&dir).unwrap();
     let (addr, ca) = tls::serve_tls(&dir);
     let url = format!("https://localhost:{}/", addr.port());
+
     // Untrusted self-signed certificate must fail by default.
     netprobe()
         .args(["http", &url])
         .assert()
         .code(1)
         .stdout(predicate::str::contains("TLS handshake failed"));
+
     // Trusted via --ca-file.
     netprobe()
         .args(["http", &url, "--ca-file"])
@@ -216,6 +221,7 @@ fn https_trust_is_enforced() {
         .assert()
         .code(0)
         .stdout(predicate::str::contains("tls=1.3"));
+
     // --insecure succeeds but warns.
     netprobe()
         .args(["http", &url, "--insecure"])
@@ -274,17 +280,21 @@ fn dns_stub() -> SocketAddr {
         let mut buf = [0u8; 512];
         while let Ok((n, peer)) = sock.recv_from(&mut buf) {
             let q = &buf[..n];
+
             if n < 12 {
                 continue;
             }
+
             // Question name ends at the first zero-length label.
             let mut i = 12;
             let mut labels = Vec::new();
+
             while i < n && q[i] != 0 {
                 let len = q[i] as usize;
                 labels.push(String::from_utf8_lossy(&q[i + 1..i + 1 + len]).to_string());
                 i += 1 + len;
             }
+
             let qend = i + 5; // zero byte + qtype + qclass
             let name = labels.join(".");
             let nx = name == "missing.test";
@@ -293,9 +303,11 @@ fn dns_stub() -> SocketAddr {
             r.extend_from_slice(&[0x81, if nx { 0x83 } else { 0x80 }]); // QR RD RA, rcode
             r.extend_from_slice(&[0, 1, 0, if nx { 0 } else { 1 }, 0, 0, 0, 0]);
             r.extend_from_slice(&q[12..qend]);
+
             if !nx {
                 r.extend_from_slice(&[0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 192, 0, 2, 7]);
             }
+
             let _ = sock.send_to(&r, peer);
         }
     });
@@ -340,6 +352,7 @@ fn batch_mixed_results() {
     assert_eq!(v["summary"]["jobs"], 3);
     assert_eq!(v["summary"]["ok"], 2);
     assert_eq!(v["summary"]["failed"], 1);
+
     // Output preserves input order.
     assert!(
         v["jobs"][2]["label"]

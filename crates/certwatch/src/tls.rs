@@ -24,17 +24,21 @@ pub fn webpki_verifier(
     include_native: bool,
 ) -> Result<Arc<WebPkiServerVerifier>, String> {
     let mut roots = RootCertStore::empty();
+
     if include_native {
         roots.add_parsable_certificates(rustls_native_certs::load_native_certs().certs);
     }
+
     if let Some(path) = ca_file {
         let certs: Vec<CertificateDer<'static>> = CertificateDer::pem_file_iter(path)
             .map_err(|e| format!("cannot read CA file {}: {e}", path.display()))?
             .collect::<Result<_, _>>()
             .map_err(|e| format!("invalid PEM in {}: {e}", path.display()))?;
+
         if certs.is_empty() {
             return Err(format!("no certificates found in {}", path.display()));
         }
+
         let (_, bad) = roots.add_parsable_certificates(certs);
         if bad > 0 {
             return Err(format!(
@@ -43,9 +47,11 @@ pub fn webpki_verifier(
             ));
         }
     }
+
     if roots.is_empty() {
         return Err("no trusted root certificates available; use --ca-file".into());
     }
+
     WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider())
         .build()
         .map_err(|e| format!("cannot build certificate verifier: {e}"))
@@ -95,9 +101,11 @@ impl ServerCertVerifier for RecordingVerifier {
             .inner
             .verify_server_cert(end_entity, intermediates, server_name, ocsp, now)
             .map(|_| ());
+
         if let Ok(mut g) = self.verdict.lock() {
             *g = Some(result);
         }
+
         Ok(ServerCertVerified::assertion())
     }
 
@@ -128,6 +136,7 @@ impl ServerCertVerifier for RecordingVerifier {
 /// Classify a verification error into a stable category and message.
 pub fn classify(err: &rustls::Error) -> (&'static str, String) {
     use rustls::CertificateError as C;
+
     match err {
         rustls::Error::InvalidCertificate(c) => {
             let kind = match c {
@@ -139,6 +148,7 @@ pub fn classify(err: &rustls::Error) -> (&'static str, String) {
                 C::BadSignature | C::UnsupportedSignatureAlgorithmContext { .. } => "bad_signature",
                 _ => "invalid",
             };
+
             let msg = match c {
                 C::UnknownIssuer => {
                     "untrusted: unknown issuer (incomplete chain, private CA, or self-signed)"
@@ -146,6 +156,7 @@ pub fn classify(err: &rustls::Error) -> (&'static str, String) {
                 }
                 _ => err.to_string(),
             };
+
             (kind, msg)
         }
         other => ("invalid", other.to_string()),

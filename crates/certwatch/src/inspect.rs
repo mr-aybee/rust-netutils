@@ -18,9 +18,11 @@ pub fn read_certs(bytes: &[u8]) -> Result<Vec<Vec<u8>>, String> {
             .into_iter()
             .map(|c| c.as_ref().to_vec())
             .collect();
+
         if certs.is_empty() {
             return Err("no CERTIFICATE blocks found".into());
         }
+
         Ok(certs)
     } else {
         Ok(vec![bytes.to_vec()])
@@ -30,6 +32,7 @@ pub fn read_certs(bytes: &[u8]) -> Result<Vec<Vec<u8>>, String> {
 pub fn inspect(path: &Path, policy: Policy) -> CheckResult {
     let start = Instant::now();
     let target = path.display().to_string();
+
     let bytes = match std::fs::metadata(path).and_then(|m| {
         if m.len() > MAX_FILE {
             Err(std::io::Error::other(format!(
@@ -42,18 +45,22 @@ pub fn inspect(path: &Path, policy: Policy) -> CheckResult {
         Ok(b) => b,
         Err(e) => return CheckResult::error(target, format!("cannot read file: {e}"), start),
     };
+
     let ders = match read_certs(&bytes) {
         Ok(d) => d,
         Err(e) => return CheckResult::error(target, e, start),
     };
+
     let now = now_unix();
     let mut chain = Vec::with_capacity(ders.len());
+
     for der in &ders {
         match cert::parse(der, now) {
             Ok(c) => chain.push(c),
             Err(e) => return CheckResult::error(target, e, start),
         }
     }
+
     let (verdict, problems, days_left, chain_days_left) = evaluate(&chain, None, policy);
     let mut r = CheckResult::error(target, String::new(), start);
     r.verdict = verdict;

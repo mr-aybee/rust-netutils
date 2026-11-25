@@ -39,6 +39,7 @@ impl Status {
                 Status::Usage => 4,
             }
         }
+
         if rank(other) > rank(self) {
             other
         } else {
@@ -77,9 +78,11 @@ pub fn parse_duration(input: &str) -> Result<Duration, DurationError> {
             "invalid duration '{input}': missing number"
         )));
     }
+
     let value: f64 = num
         .parse()
         .map_err(|_| DurationError(format!("invalid duration '{input}': bad number")))?;
+
     let secs = match unit {
         "" | "s" => value,
         "ms" => value / 1_000.0,
@@ -92,12 +95,14 @@ pub fn parse_duration(input: &str) -> Result<Duration, DurationError> {
             )));
         }
     };
+
     // Cap at one week to keep arithmetic and timers well-defined.
     if !secs.is_finite() || secs <= 0.0 || secs > 604_800.0 {
         return Err(DurationError(format!(
             "invalid duration '{input}': must be > 0 and <= 7 days"
         )));
     }
+
     Ok(Duration::from_secs_f64(secs))
 }
 

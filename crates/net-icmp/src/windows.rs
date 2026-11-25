@@ -53,12 +53,14 @@ fn open(v6: bool) -> Result<Handle, String> {
             IcmpCreateFile()
         }
     };
+
     if h == INVALID_HANDLE_VALUE || h.is_null() {
         return Err(format!(
             "IcmpCreateFile failed: {}",
             std::io::Error::last_os_error()
         ));
     }
+
     Ok(Handle(h))
 }
 
@@ -84,12 +86,15 @@ pub fn echo(ip: IpAddr, payload: &[u8], timeout: Duration) -> Echo {
     let timeout_ms = u32::try_from(timeout.as_millis())
         .unwrap_or(u32::MAX)
         .max(1);
+
     let Ok(size) = u16::try_from(payload.len()) else {
         return Echo::Error("payload too large".into());
     };
+
     // 8-byte aligned buffer, generously sized (reply struct + payload + ICMP error + IO_STATUS_BLOCK).
     let mut buf = vec![0u64; (256 + payload.len()).div_ceil(8)];
     let buf_bytes = u32::try_from(buf.len() * 8).unwrap_or(u32::MAX);
+
     match ip {
         IpAddr::V4(v4) => echo_v4(v4, payload, size, timeout_ms, &mut buf, buf_bytes),
         IpAddr::V6(v6) => echo_v6(v6, payload, size, timeout_ms, &mut buf, buf_bytes),
@@ -108,8 +113,10 @@ fn echo_v4(
         Ok(h) => h,
         Err(e) => return Echo::Error(e),
     };
+
     // IPAddr is in network byte order: the octets as laid out in memory.
     let dest = u32::from_ne_bytes(ip.octets());
+
     // SAFETY: valid handle; payload pointer/size describe a live slice; reply buffer is
     // owned, aligned and `buf_bytes` long; options pointer may be null.
     let n = unsafe {
@@ -124,10 +131,12 @@ fn echo_v4(
             timeout_ms,
         )
     };
+
     if n == 0 {
         let code = std::io::Error::last_os_error().raw_os_error().unwrap_or(0) as u32;
         return status_text(code);
     }
+
     // SAFETY: n > 0 means the buffer starts with a fully written ICMP_ECHO_REPLY.
     let reply: ICMP_ECHO_REPLY = unsafe { std::ptr::read_unaligned(buf.as_ptr().cast()) };
     match status_text(reply.Status) {
@@ -162,8 +171,10 @@ fn echo_v6(
         Ok(h) => h,
         Err(e) => return Echo::Error(e),
     };
+
     let src = sockaddr6(Ipv6Addr::UNSPECIFIED);
     let dst = sockaddr6(ip);
+
     // SAFETY: valid handle; no event/APC (synchronous call); src/dst point to live
     // SOCKADDR_IN6 values; payload and reply buffer as in echo_v4.
     let n = unsafe {
@@ -182,10 +193,12 @@ fn echo_v6(
             timeout_ms,
         )
     };
+
     if n == 0 {
         let code = std::io::Error::last_os_error().raw_os_error().unwrap_or(0) as u32;
         return status_text(code);
     }
+
     // SAFETY: n > 0 means the buffer starts with a fully written ICMPV6_ECHO_REPLY.
     let reply: ICMPV6_ECHO_REPLY_LH = unsafe { std::ptr::read_unaligned(buf.as_ptr().cast()) };
     match status_text(reply.Status) {

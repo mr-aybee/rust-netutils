@@ -26,6 +26,7 @@ pub fn parse_endpoint(input: &str, default_port: Option<u16>) -> Result<Endpoint
     if s.is_empty() {
         return Err("empty target".into());
     }
+
     let (host, port) = if let Some(rest) = s.strip_prefix('[') {
         let end = rest
             .find(']')
@@ -37,9 +38,11 @@ pub fn parse_endpoint(input: &str, default_port: Option<u16>) -> Result<Endpoint
             None if after.is_empty() => None,
             None => return Err(format!("invalid target '{input}'")),
         };
+
         if host.parse::<std::net::Ipv6Addr>().is_err() {
             return Err(format!("invalid IPv6 literal '{host}'"));
         }
+
         (host, port)
     } else if s.parse::<IpAddr>().is_ok() {
         // Bare IPv4 or unbracketed IPv6 literal with no port.
@@ -50,11 +53,14 @@ pub fn parse_endpoint(input: &str, default_port: Option<u16>) -> Result<Endpoint
             None => (s, None),
         }
     };
+
     validate_host(host).map_err(|e| format!("invalid target '{input}': {e}"))?;
+
     let port = match port {
         Some(p) => parse_port(p)?,
         None => default_port.ok_or_else(|| format!("invalid target '{input}': missing port"))?,
     };
+
     Ok(Endpoint {
         host: host.to_string(),
         port,
@@ -73,16 +79,20 @@ pub fn validate_host(host: &str) -> Result<(), String> {
     if host.parse::<IpAddr>().is_ok() {
         return Ok(());
     }
+
     if host.is_empty() || host.len() > 253 {
         return Err("host name length must be 1-253".into());
     }
+
     for label in host.trim_end_matches('.').split('.') {
         if label.is_empty() || label.len() > 63 {
             return Err("host name labels must be 1-63 characters".into());
         }
+
         if label.starts_with('-') || label.ends_with('-') {
             return Err("host name labels must not start or end with '-'".into());
         }
+
         if !label
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
@@ -90,6 +100,7 @@ pub fn validate_host(host: &str) -> Result<(), String> {
             return Err("host name contains invalid characters".into());
         }
     }
+
     Ok(())
 }
 

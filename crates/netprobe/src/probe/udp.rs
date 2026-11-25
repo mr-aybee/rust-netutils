@@ -24,8 +24,10 @@ pub fn decode_escaped(s: &str) -> Result<Vec<u8>, String> {
         if c != '\\' {
             let mut buf = [0u8; 4];
             out.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
+
             continue;
         }
+
         match chars.next() {
             Some('n') => out.push(b'\n'),
             Some('r') => out.push(b'\r'),
@@ -44,6 +46,7 @@ pub fn decode_escaped(s: &str) -> Result<Vec<u8>, String> {
             None => return Err("trailing backslash in payload".into()),
         }
     }
+
     Ok(out)
 }
 
@@ -53,6 +56,7 @@ pub fn decode_hex(s: &str) -> Result<Vec<u8>, String> {
     if !digits.len().is_multiple_of(2) {
         return Err("hex payload must have an even number of digits".into());
     }
+
     digits
         .chunks(2)
         .map(|p| {
@@ -76,6 +80,7 @@ fn preview(b: &[u8]) -> String {
             }
         })
         .collect();
+
     if b.len() > 32 {
         format!("{shown}…")
     } else {
@@ -93,17 +98,21 @@ pub async fn probe(ep: &Endpoint, payload: &[u8], wait: Duration, seq: u32) -> P
         Ok(Err(e)) => {
             r.error = Some(format!("resolve failed: {}", describe_io(&e)));
             r.elapsed_ms = ms(start.elapsed());
+
             return r;
         }
         Err(_) => {
             r.error = Some("timed out resolving host".into());
             r.elapsed_ms = ms(start.elapsed());
+
             return r;
         }
     };
+
     r.timings.dns_ms = Some(ms(start.elapsed()));
     r.address = Some(addr);
     let sent_at = Instant::now();
+
     match exchange(addr, payload, deadline).await {
         Ok(Some(reply)) => {
             r.outcome = Outcome::Ok;
@@ -128,6 +137,7 @@ pub async fn probe(ep: &Endpoint, payload: &[u8], wait: Duration, seq: u32) -> P
         }
         Err(e) => r.error = Some(describe_io(&e)),
     }
+
     r.elapsed_ms = ms(start.elapsed());
     r
 }
@@ -142,7 +152,9 @@ async fn exchange(
     } else {
         (Ipv6Addr::UNSPECIFIED, 0).into()
     };
+
     let sock = UdpSocket::bind(bind).await?;
+
     // Connecting filters replies to this peer and surfaces ICMP errors.
     sock.connect(addr).await?;
     sock.send(payload).await?;
@@ -167,6 +179,7 @@ mod tests {
             decode_escaped("a\\n\\x00\\xff\\\\").unwrap(),
             b"a\n\x00\xff\\"
         );
+
         for bad in ["\\x", "\\xg1", "\\q", "x\\"] {
             assert!(decode_escaped(bad).is_err(), "{bad}");
         }

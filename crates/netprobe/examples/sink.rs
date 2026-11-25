@@ -9,8 +9,10 @@ fn main() -> std::io::Result<()> {
         .unwrap_or_else(|| "127.0.0.1:7000".into());
     let listener = TcpListener::bind(&addr)?;
     eprintln!("sink listening on {}", listener.local_addr()?);
+
     for conn in listener.incoming() {
         drop(conn);
     }
+
     Ok(())
 }

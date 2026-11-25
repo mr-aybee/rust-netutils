@@ -63,6 +63,7 @@ fn json_and_established_pair() {
         .iter()
         .map(|s| s["state"].as_str().unwrap())
         .collect();
+
     // Listener + both ends of the connection.
     assert_eq!(
         states.iter().filter(|s| **s == "LISTEN").count(),

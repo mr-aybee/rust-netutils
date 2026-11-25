@@ -25,6 +25,7 @@ pub fn summarize(samples: &mut [f64]) -> Option<Summary> {
     if samples.is_empty() {
         return None;
     }
+
     samples.sort_by(f64::total_cmp);
     let n = samples.len() as f64;
     let avg = samples.iter().sum::<f64>() / n;

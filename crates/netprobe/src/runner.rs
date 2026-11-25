@@ -65,13 +65,17 @@ impl Report {
         if self.sent == 0 {
             return Status::Failure;
         }
+
         let mut s = Status::Ok;
+
         if self.inconclusive > 0 {
             s = s.worst(Status::Inconclusive);
         }
+
         if self.failed > 0 {
             s = s.worst(Status::Failure);
         }
+
         s
     }
 }
@@ -129,6 +133,7 @@ where
             r = attempt => { on_result(&r); results.push(r); }
             () = &mut cancel => return (results, true),
         }
+
         if seq < plan.count {
             tokio::select! {
                 () = tokio::time::sleep(plan.interval) => {}

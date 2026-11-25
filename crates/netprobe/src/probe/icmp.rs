@@ -26,6 +26,7 @@ pub async fn probe(
 ) -> ProbeResult {
     let mut r = ProbeResult::new("icmp", host.to_string(), seq);
     r.address = Some(SocketAddr::new(ip, 0));
+
     match sock.echo(ip, id, (seq & 0xffff) as u16, wait).await {
         net_icmp::Echo::Reply { rtt, bytes } => {
             r.outcome = Outcome::Ok;
@@ -38,5 +39,6 @@ pub async fn probe(
         }
         net_icmp::Echo::Error(e) => r.error = Some(e),
     }
+
     r
 }

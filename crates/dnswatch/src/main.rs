@@ -105,9 +105,12 @@ fn setup(c: &Common) -> Result<Prepared, (Status, String)> {
     for t in &c.types {
         types.push(query::parse_type(t).map_err(usage)?);
     }
+
     let mut queries = Vec::new();
+
     for n in &c.names {
         validate_host(n).map_err(|e| usage(format!("invalid name '{n}': {e}")))?;
+
         for t in &types {
             queries.push(Query {
                 name: n.clone(),
@@ -115,6 +118,7 @@ fn setup(c: &Common) -> Result<Prepared, (Status, String)> {
             });
         }
     }
+
     let servers: Vec<Option<SocketAddr>> = if c.servers.is_empty() {
         vec![None]
     } else {
@@ -124,11 +128,13 @@ fn setup(c: &Common) -> Result<Prepared, (Status, String)> {
             .collect::<Result<_, _>>()
             .map_err(usage)?
     };
+
     if queries.len() * servers.len() > MAX_QUERIES {
         return Err(usage(format!(
             "more than {MAX_QUERIES} name/type/server combinations"
         )));
     }
+
     let sources = servers
         .into_iter()
         .map(|s| query::build_source(s, c.timeout))
@@ -149,6 +155,7 @@ fn main() -> ExitCode {
             });
         }
     };
+
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -159,16 +166,19 @@ fn main() -> ExitCode {
             return ExitCode::from(Status::Failure.code());
         }
     };
+
     rt.block_on(run(cli))
 }
 
 async fn run(cli: Cli) -> ExitCode {
     let json = cli.json;
+
     let common = match &cli.command {
         Command::Watch { common, .. }
         | Command::Wait { common, .. }
         | Command::Compare { common } => common,
     };
+
     let (sources, queries) = match setup(common) {
         Ok(v) => v,
         Err((status, msg)) => {
@@ -176,12 +186,14 @@ async fn run(cli: Cli) -> ExitCode {
             return ExitCode::from(status.code());
         }
     };
+
     let concurrency = usize::from(common.concurrency);
     let ctrl_c = async {
         if tokio::signal::ctrl_c().await.is_err() {
             std::future::pending::<()>().await;
         }
     };
+
     match cli.command {
         Command::Watch {
             interval,
@@ -208,6 +220,7 @@ async fn run(cli: Cli) -> ExitCode {
             if expect.iter().any(|e| e.trim().is_empty()) {
                 return usage("--expect values must not be empty");
             }
+
             let s = Settings {
                 interval,
                 concurrency,
@@ -237,6 +250,7 @@ async fn run(cli: Cli) -> ExitCode {
                 defs.windows(2).any(|w| w[0] != w[1])
             });
             let mut out = std::io::stdout().lock();
+
             if json {
                 let doc = serde_json::json!({"version": 1, "results": results, "consistent": !differ && !errors});
                 let _ = writeln!(out, "{doc:#}");
@@ -253,11 +267,13 @@ async fn run(cli: Cli) -> ExitCode {
                             "DIFFERENT"
                         }
                     );
+
                     for (server, a) in &r.answers {
                         let _ = writeln!(out, "  @{server:<20} {}", a.summary());
                     }
                 }
             }
+
             let status = if differ {
                 Status::Failure
             } else if errors {
@@ -265,6 +281,7 @@ async fn run(cli: Cli) -> ExitCode {
             } else {
                 Status::Ok
             };
+
             ExitCode::from(status.code())
         }
     }

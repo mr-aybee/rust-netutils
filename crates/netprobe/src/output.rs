@@ -15,27 +15,33 @@ pub enum Verbosity {
 /// Format one attempt as a single human-readable line.
 pub fn human_line(r: &ProbeResult, verbosity: Verbosity) -> String {
     let mut line = format!("{} {} seq={} ", r.probe, r.target, r.seq);
+
     match r.outcome {
         Outcome::Ok => line.push_str(&format!("ok {:.2} ms", r.elapsed_ms)),
         Outcome::Failed => line.push_str("FAILED"),
         Outcome::Inconclusive => line.push_str("INCONCLUSIVE"),
     }
+
     match r.address {
         // ICMP has no port; show the bare IP.
         Some(a) if r.probe == "icmp" => line.push_str(&format!(" addr={}", a.ip())),
         Some(a) => line.push_str(&format!(" addr={a}")),
         None => {}
     }
+
     if let Some(d) = &r.detail {
         line.push_str(&format!(" {d}"));
     }
+
     if let Some(e) = &r.error {
         line.push_str(&format!(": {e}"));
     }
+
     if verbosity == Verbosity::Verbose {
         for a in &r.answers {
             line.push_str(&format!("\n    {a}"));
         }
+
         let t = &r.timings;
         let parts: Vec<String> = [
             ("dns", t.dns_ms),
@@ -46,10 +52,12 @@ pub fn human_line(r: &ProbeResult, verbosity: Verbosity) -> String {
         .into_iter()
         .filter_map(|(n, v)| v.map(|v| format!("{n}={v:.2}ms")))
         .collect();
+
         if !parts.is_empty() {
             line.push_str(&format!(" [{}]", parts.join(" ")));
         }
     }
+
     line
 }
 
@@ -67,12 +75,14 @@ pub fn human_summary(target: &str, rep: &Report) -> String {
             ""
         }
     );
+
     if let Some(l) = &rep.latency {
         s.push_str(&format!(
             "\nlatency min/avg/p50/p95/max/stddev = {:.2}/{:.2}/{:.2}/{:.2}/{:.2}/{:.2} ms",
             l.min_ms, l.avg_ms, l.p50_ms, l.p95_ms, l.max_ms, l.stddev_ms
         ));
     }
+
     s
 }
 

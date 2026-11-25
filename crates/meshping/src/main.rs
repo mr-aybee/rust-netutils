@@ -103,6 +103,7 @@ fn main() -> ExitCode {
             });
         }
     };
+
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -113,11 +114,13 @@ fn main() -> ExitCode {
             return ExitCode::from(Status::Failure.code());
         }
     };
+
     rt.block_on(run(cli))
 }
 
 fn read_targets(cli: &Cli) -> Result<Vec<Endpoint>, String> {
     let mut items = cli.hosts.clone();
+
     if let Some(path) = &cli.hosts_file {
         let text = if path.as_os_str() == "-" {
             let mut s = String::new();
@@ -131,18 +134,22 @@ fn read_targets(cli: &Cli) -> Result<Vec<Endpoint>, String> {
             std::fs::read_to_string(path)
                 .map_err(|e| format!("cannot read {}: {e}", path.display()))?
         };
+
         items.extend(
             text.lines()
                 .map(|l| l.split('#').next().unwrap_or_default().trim().to_string())
                 .filter(|l| !l.is_empty()),
         );
     }
+
     if items.is_empty() {
         return Err("no hosts given (pass HOST[:PORT] or --hosts FILE)".into());
     }
+
     if items.len() > MAX_HOSTS {
         return Err(format!("more than {MAX_HOSTS} hosts"));
     }
+
     items
         .iter()
         .map(|h| parse_endpoint(h, Some(cli.tcp_port)))
@@ -162,12 +169,15 @@ async fn run(cli: Cli) -> ExitCode {
     let timeout = cli
         .timeout
         .unwrap_or_else(|| cli.interval.min(Duration::from_secs(1)));
+
     if timeout > cli.interval {
         return usage("--timeout must not exceed --interval");
     }
+
     if cli.count == Some(0) {
         return usage("--count must be at least 1");
     }
+
     let targets = match read_targets(&cli) {
         Ok(t) => t,
         Err(e) => return usage(e),
@@ -176,9 +186,11 @@ async fn run(cli: Cli) -> ExitCode {
     // Resolve once at start; probing then uses fixed addresses (no per-probe DNS cost).
     let mut hosts = Vec::with_capacity(targets.len());
     let mut fallback_noted = false;
+
     // One shared ICMP socket per address family, opened lazily.
     let mut pingers: [Option<Result<Arc<Pinger>, String>>; 2] = [None, None];
     let id = (std::process::id() & 0xffff) as u16;
+
     for ep in &targets {
         let ip = match resolve(ep).await {
             Ok(ip) => ip,
@@ -187,6 +199,7 @@ async fn run(cli: Cli) -> ExitCode {
                 return ExitCode::from(Status::Failure.code());
             }
         };
+
         let prober = match cli.mode {
             ModeArg::Tcp => Prober::Tcp { port: ep.port },
             ModeArg::Icmp | ModeArg::Auto => {
@@ -194,6 +207,7 @@ async fn run(cli: Cli) -> ExitCode {
                 let pinger = pingers[fam]
                     .get_or_insert_with(|| Pinger::open(ip.is_ipv6(), id).map(Arc::new))
                     .clone();
+
                 match pinger {
                     Ok(pinger) => Prober::Icmp { pinger },
                     Err(e) if cli.mode == ModeArg::Icmp => {
@@ -208,16 +222,19 @@ async fn run(cli: Cli) -> ExitCode {
                             );
                             fallback_noted = true;
                         }
+
                         Prober::Tcp { port: ep.port }
                     }
                 }
             }
         };
+
         let label = if matches!(prober, Prober::Tcp { .. }) {
             format!("{}:{}", ep.host, ep.port)
         } else {
             ep.host.clone()
         };
+
         hosts.push(Host { label, ip, prober });
     }
 
@@ -231,6 +248,7 @@ async fn run(cli: Cli) -> ExitCode {
 
     // One task per host; start times are spread across the interval to avoid bursts.
     let local = tokio::task::LocalSet::new();
+
     for (i, host) in hosts.into_iter().enumerate() {
         let tx = tx.clone();
         let (interval, count) = (cli.interval, cli.count);
@@ -240,12 +258,15 @@ async fn run(cli: Cli) -> ExitCode {
             let mut ticker = tokio::time::interval(interval);
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
             let mut seq: u64 = 0;
+
             loop {
                 if count.is_some_and(|c| seq >= c) {
                     break;
                 }
+
                 ticker.tick().await;
                 let result = host.prober.probe(host.ip, timeout).await;
+
                 if tx
                     .send(Sample {
                         host: i,
@@ -258,15 +279,18 @@ async fn run(cli: Cli) -> ExitCode {
                 {
                     break;
                 }
+
                 seq += 1;
             }
         });
     }
+
     drop(tx);
 
     if cli.output == Output::Csv {
         println!("time,host,mode,seq,rtt_ms,status");
     }
+
     let ctrl_c = tokio::signal::ctrl_c();
     tokio::pin!(ctrl_c);
     let mut report = tokio::time::interval_at(tokio::time::Instant::now() + cli.report, cli.report);
@@ -295,6 +319,7 @@ async fn run(cli: Cli) -> ExitCode {
         let mut err = std::io::stderr().lock();
         let _ = write!(err, "{}", table_text(&labels, &modes, &stats, interrupted));
     }
+
     let unreachable = stats.iter().any(|s| s.sent > 0 && s.received == 0);
     ExitCode::from(if unreachable {
         Status::Failure.code()
@@ -305,6 +330,7 @@ async fn run(cli: Cli) -> ExitCode {
 
 fn emit_sample(output: Output, s: &Sample, label: &str, mode: Mode, rtt_ms: Option<f64>) {
     let mut out = std::io::stdout().lock();
+
     match output {
         Output::Table => {}
         Output::Csv => {
@@ -315,6 +341,7 @@ fn emit_sample(output: Output, s: &Sample, label: &str, mode: Mode, rtt_ms: Opti
                 ),
                 Err(e) => (String::new(), format!("\"{}\"", e.replace('"', "'"))),
             };
+
             let _ = writeln!(
                 out,
                 "{},{label},{mode},{},{rtt},{status}",
@@ -353,6 +380,7 @@ fn table_text(labels: &[String], modes: &[Mode], stats: &[HostStats], interrupte
         "MAX",
         "JITTER"
     );
+
     for ((label, mode), st) in labels.iter().zip(modes).zip(stats) {
         let Snapshot {
             sent,
@@ -376,6 +404,7 @@ fn table_text(labels: &[String], modes: &[Mode], stats: &[HostStats], interrupte
             ms(jitter_ms)
         ));
     }
+
     s
 }
 
