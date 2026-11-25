@@ -1,18 +1,21 @@
 //! DNS querying with a canonical, TTL-independent view of answers.
 
+use std::net::SocketAddr;
+use std::str::FromStr;
+use std::time::Duration;
+
 use hickory_resolver::TokioResolver;
 use hickory_resolver::config::{NameServerConfig, ResolverConfig};
 use hickory_resolver::net::runtime::TokioRuntimeProvider;
 use hickory_resolver::proto::rr::RecordType;
 use serde::Serialize;
-use std::net::SocketAddr;
-use std::str::FromStr;
-use std::time::Duration;
 
+/// Record types accepted by `--type`.
 pub const SUPPORTED: &[&str] = &[
     "A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "PTR", "SRV", "CAA",
 ];
 
+/// Parse a record type name (case-insensitive) from [`SUPPORTED`].
 pub fn parse_type(s: &str) -> Result<RecordType, String> {
     let up = s.trim().to_ascii_uppercase();
     if !SUPPORTED.contains(&up.as_str()) {
@@ -21,6 +24,7 @@ pub fn parse_type(s: &str) -> Result<RecordType, String> {
             SUPPORTED.join(", ")
         ));
     }
+
     RecordType::from_str(&up).map_err(|e| e.to_string())
 }
 
@@ -39,10 +43,12 @@ pub enum Answer {
 }
 
 impl Answer {
+    /// Whether this is a definitive state (records, NXDOMAIN or NODATA) rather than an error.
     pub fn is_definitive(&self) -> bool {
         !matches!(self, Answer::Error(_))
     }
 
+    /// Short human-readable description of the answer.
     pub fn summary(&self) -> String {
         match self {
             Answer::Records(r) if r.is_empty() => "(empty)".into(),
@@ -56,6 +62,7 @@ impl Answer {
     /// Values of the requested type only (drops CNAMEs followed on the way).
     pub fn values_of(&self, rtype: RecordType) -> Vec<String> {
         let prefix = format!("{rtype} ");
+
         match self {
             Answer::Records(r) => r
                 .iter()
@@ -69,16 +76,19 @@ impl Answer {
 /// Records added and removed between two record sets.
 pub fn diff(old: &Answer, new: &Answer) -> (Vec<String>, Vec<String>) {
     let empty = Vec::new();
+
     let o = if let Answer::Records(r) = old {
         r
     } else {
         &empty
     };
+
     let n = if let Answer::Records(r) = new {
         r
     } else {
         &empty
     };
+
     let added = n.iter().filter(|x| !o.contains(x)).cloned().collect();
     let removed = o.iter().filter(|x| !n.contains(x)).cloned().collect();
     (added, removed)
@@ -86,23 +96,29 @@ pub fn diff(old: &Answer, new: &Answer) -> (Vec<String>, Vec<String>) {
 
 /// A resolver to query and how it is labelled in output.
 pub struct Source {
+    /// Label used in output: the server address, or `system`.
     pub label: String,
+    /// Resolver with caching disabled and a single attempt per query.
     pub resolver: TokioResolver,
 }
 
+/// Build a source for `server`, or for the system resolver when `None`.
 pub fn build_source(server: Option<SocketAddr>, timeout: Duration) -> Result<Source, String> {
     let provider = TokioRuntimeProvider::default();
+
     let (label, mut builder) = match server {
         Some(addr) => {
             let mut ns = NameServerConfig::udp_and_tcp(addr.ip());
             for c in &mut ns.connections {
                 c.port = addr.port();
             }
+
             let label = if addr.port() == 53 {
                 addr.ip().to_string()
             } else {
                 addr.to_string()
             };
+
             (
                 label,
                 TokioResolver::builder_with_config(
@@ -117,6 +133,7 @@ pub fn build_source(server: Option<SocketAddr>, timeout: Duration) -> Result<Sou
                 .map_err(|e| format!("cannot read system DNS configuration: {e}"))?,
         ),
     };
+
     let opts = builder.options_mut();
     opts.cache_size = 0;
     opts.attempts = 1;
@@ -127,6 +144,7 @@ pub fn build_source(server: Option<SocketAddr>, timeout: Duration) -> Result<Sou
     Ok(Source { label, resolver })
 }
 
+/// Query `name`/`rtype` once and classify the result.
 pub async fn query(resolver: &TokioResolver, name: &str, rtype: RecordType) -> Answer {
     match resolver.lookup(name, rtype).await {
         Ok(lookup) => {
@@ -137,6 +155,7 @@ pub async fn query(resolver: &TokioResolver, name: &str, rtype: RecordType) -> A
                 .collect();
             recs.sort_unstable();
             recs.dedup();
+
             if recs.is_empty() {
                 Answer::Nodata
             } else {

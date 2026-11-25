@@ -1,3 +1,8 @@
+//! NetProbe command-line entry point.
+
+use std::io::Write;
+use std::process::ExitCode;
+
 use clap::Parser;
 use net_common::Status;
 use netprobe::cli::{Cli, Command};
@@ -5,8 +10,6 @@ use netprobe::output::{self, Verbosity};
 use netprobe::probe::{dns, http, icmp, tcp, udp};
 use netprobe::runner::{self, Plan, Report};
 use netprobe::target::parse_endpoint;
-use std::io::Write;
-use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let cli = match Cli::try_parse() {
@@ -20,6 +23,7 @@ fn main() -> ExitCode {
             });
         }
     };
+
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -30,6 +34,7 @@ fn main() -> ExitCode {
             return ExitCode::from(Status::Failure.code());
         }
     };
+
     ExitCode::from(rt.block_on(run(cli)).code())
 }
 
@@ -41,6 +46,7 @@ async fn run(cli: Cli) -> Status {
     } else {
         Verbosity::Normal
     };
+
     let json = cli.json;
     let print = move |r: &netprobe::probe::ProbeResult| {
         if !json && verbosity != Verbosity::Quiet {
@@ -87,6 +93,7 @@ async fn run(cli: Cli) -> Status {
                     return Status::Usage;
                 }
             };
+
             let plan = plan_of(&common, std::time::Duration::ZERO);
             let label = ep.to_string();
             let out = runner::run(
@@ -115,16 +122,19 @@ async fn run(cli: Cli) -> Status {
                     return Status::Usage;
                 }
             };
+
             if let Some(bad) = expect.iter().find(|c| !(100..=599).contains(*c)) {
                 eprintln!("netprobe: invalid --expect status code {bad}");
                 return Status::Usage;
             }
+
             let tls = if url.tls {
                 if insecure {
                     eprintln!(
                         "netprobe: WARNING: --insecure disables certificate verification; results do not prove the server is authentic"
                     );
                 }
+
                 match http::client_config(ca_file.as_deref(), insecure) {
                     Ok(c) => Some(c),
                     Err(e) => {
@@ -135,6 +145,7 @@ async fn run(cli: Cli) -> Status {
             } else {
                 None
             };
+
             let opts = http::HttpOptions {
                 method: if head {
                     http::Method::Head
@@ -168,11 +179,14 @@ async fn run(cli: Cli) -> Status {
                     (None, Some(h)) => udp::decode_hex(&h)?,
                     (None, None) => Vec::new(),
                 };
+
                 if data.len() > udp::MAX_PAYLOAD {
                     return Err(format!("payload exceeds {} bytes", udp::MAX_PAYLOAD));
                 }
+
                 Ok((ep, data))
             });
+
             let (ep, data) = match parsed {
                 Ok(v) => v,
                 Err(e) => {
@@ -180,6 +194,7 @@ async fn run(cli: Cli) -> Status {
                     return Status::Usage;
                 }
             };
+
             let plan = plan_of(&common, std::time::Duration::from_secs(1));
             let label = ep.to_string();
             let out = runner::run(
@@ -198,6 +213,7 @@ async fn run(cli: Cli) -> Status {
                 eprintln!("netprobe: invalid host '{host}': {e}");
                 return Status::Usage;
             }
+
             let ip = match icmp::resolve_ip(&host).await {
                 Ok(ip) => ip,
                 Err(e) => {
@@ -205,6 +221,7 @@ async fn run(cli: Cli) -> Status {
                     return Status::Failure;
                 }
             };
+
             let sock = match icmp::IcmpSocket::open(ip.is_ipv6()) {
                 Ok(s) => s,
                 Err(e) => {
@@ -212,6 +229,7 @@ async fn run(cli: Cli) -> Status {
                     return Status::Failure;
                 }
             };
+
             // Identifier distinguishes our packets on raw sockets.
             let id = (std::process::id() & 0xffff) as u16;
             let plan = plan_of(&common, std::time::Duration::from_secs(1));
@@ -240,6 +258,7 @@ async fn run(cli: Cli) -> Status {
                     return Status::Usage;
                 }
             };
+
             let resolver = match dns::build_resolver(server, common.timeout) {
                 Ok(r) => r,
                 Err(e) => {
@@ -247,6 +266,7 @@ async fn run(cli: Cli) -> Status {
                     return Status::Failure;
                 }
             };
+
             let plan = plan_of(&common, std::time::Duration::ZERO);
             let label = format!("{name} {rtype}");
             let out = runner::run(
@@ -263,6 +283,7 @@ async fn run(cli: Cli) -> Status {
     };
 
     let report = Report::from_results(&results, interrupted);
+
     if json {
         if let Err(e) = output::write_json(&results, &report)
             && e.kind() != std::io::ErrorKind::BrokenPipe
@@ -273,6 +294,7 @@ async fn run(cli: Cli) -> Status {
     } else if results.len() > 1 || verbosity == Verbosity::Quiet || interrupted {
         println!("{}", output::human_summary(&target, &report));
     }
+
     report.status()
 }
 
@@ -322,8 +344,10 @@ async fn run_batch(
     cancel: impl std::future::Future<Output = ()>,
 ) -> Status {
     use netprobe::batch;
+
     let text = if file.as_os_str() == "-" {
         let mut s = String::new();
+
         match std::io::Read::read_to_string(
             &mut std::io::Read::take(std::io::stdin(), 64 * 1024 * 1024),
             &mut s,
@@ -343,6 +367,7 @@ async fn run_batch(
             }
         }
     };
+
     let jobs = match batch::parse_jobs(&text) {
         Ok(j) => j,
         Err(e) => {
@@ -350,7 +375,9 @@ async fn run_batch(
             return Status::Usage;
         }
     };
+
     let total = jobs.len();
+
     let shared = match batch::Shared::for_jobs(&jobs, common.timeout, ca_file) {
         Ok(s) => s,
         Err(e) => {
@@ -358,12 +385,15 @@ async fn run_batch(
             return Status::Failure;
         }
     };
+
     let plan = plan_of(common, std::time::Duration::ZERO);
     let on_done = |o: &batch::JobOutcome| {
         if json || verbosity == Verbosity::Quiet {
             return;
         }
+
         let mut out = std::io::stdout().lock();
+
         if o.results.len() == 1 {
             let _ = writeln!(out, "{}", output::human_line(&o.results[0], verbosity));
         } else {
@@ -385,15 +415,19 @@ async fn run_batch(
     } else {
         Status::Ok
     };
+
     let (mut ok, mut failed, mut inconclusive) = (0, 0, 0);
+
     for o in &done {
         match o.report.status() {
             Status::Ok => ok += 1,
             Status::Inconclusive => inconclusive += 1,
             _ => failed += 1,
         }
+
         status = status.worst(o.report.status());
     }
+
     let summary = output::BatchSummary {
         jobs: total,
         ok,
@@ -401,6 +435,7 @@ async fn run_batch(
         inconclusive,
         interrupted,
     };
+
     if json {
         let doc = output::BatchDoc {
             version: 1,
@@ -414,6 +449,7 @@ async fn run_batch(
                 .collect(),
             summary,
         };
+
         if let Err(e) = output::write_batch_json(&doc)
             && e.kind() != std::io::ErrorKind::BrokenPipe
         {
@@ -434,5 +470,6 @@ async fn run_batch(
             }
         );
     }
+
     status
 }

@@ -5,15 +5,17 @@
 //! closed immediately after the handshake. A failed verification is always
 //! reported as a failure; it is never hidden.
 
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+
 use rustls::client::WebPkiServerVerifier;
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::CryptoProvider;
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme};
-use std::path::Path;
-use std::sync::{Arc, Mutex};
 
+/// The *ring* crypto provider used for all TLS operations.
 pub fn provider() -> Arc<CryptoProvider> {
     Arc::new(rustls::crypto::ring::default_provider())
 }
@@ -24,17 +26,21 @@ pub fn webpki_verifier(
     include_native: bool,
 ) -> Result<Arc<WebPkiServerVerifier>, String> {
     let mut roots = RootCertStore::empty();
+
     if include_native {
         roots.add_parsable_certificates(rustls_native_certs::load_native_certs().certs);
     }
+
     if let Some(path) = ca_file {
         let certs: Vec<CertificateDer<'static>> = CertificateDer::pem_file_iter(path)
             .map_err(|e| format!("cannot read CA file {}: {e}", path.display()))?
             .collect::<Result<_, _>>()
             .map_err(|e| format!("invalid PEM in {}: {e}", path.display()))?;
+
         if certs.is_empty() {
             return Err(format!("no certificates found in {}", path.display()));
         }
+
         let (_, bad) = roots.add_parsable_certificates(certs);
         if bad > 0 {
             return Err(format!(
@@ -43,9 +49,11 @@ pub fn webpki_verifier(
             ));
         }
     }
+
     if roots.is_empty() {
         return Err("no trusted root certificates available; use --ca-file".into());
     }
+
     WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider())
         .build()
         .map_err(|e| format!("cannot build certificate verifier: {e}"))
@@ -59,6 +67,7 @@ pub struct RecordingVerifier {
 }
 
 impl RecordingVerifier {
+    /// Wrap `inner`; the verdict is recorded on the first certificate verification.
     pub fn new(inner: Arc<WebPkiServerVerifier>) -> Arc<Self> {
         Arc::new(Self {
             inner,
@@ -71,6 +80,7 @@ impl RecordingVerifier {
         self.verdict.lock().map(|g| g.clone()).unwrap_or(None)
     }
 
+    /// Client configuration that verifies through this recorder.
     pub fn client_config(self: &Arc<Self>) -> Result<Arc<ClientConfig>, String> {
         let cfg = ClientConfig::builder_with_provider(provider())
             .with_safe_default_protocol_versions()
@@ -95,9 +105,11 @@ impl ServerCertVerifier for RecordingVerifier {
             .inner
             .verify_server_cert(end_entity, intermediates, server_name, ocsp, now)
             .map(|_| ());
+
         if let Ok(mut g) = self.verdict.lock() {
             *g = Some(result);
         }
+
         Ok(ServerCertVerified::assertion())
     }
 
@@ -128,6 +140,7 @@ impl ServerCertVerifier for RecordingVerifier {
 /// Classify a verification error into a stable category and message.
 pub fn classify(err: &rustls::Error) -> (&'static str, String) {
     use rustls::CertificateError as C;
+
     match err {
         rustls::Error::InvalidCertificate(c) => {
             let kind = match c {
@@ -139,6 +152,7 @@ pub fn classify(err: &rustls::Error) -> (&'static str, String) {
                 C::BadSignature | C::UnsupportedSignatureAlgorithmContext { .. } => "bad_signature",
                 _ => "invalid",
             };
+
             let msg = match c {
                 C::UnknownIssuer => {
                     "untrusted: unknown issuer (incomplete chain, private CA, or self-signed)"
@@ -146,6 +160,7 @@ pub fn classify(err: &rustls::Error) -> (&'static str, String) {
                 }
                 _ => err.to_string(),
             };
+
             (kind, msg)
         }
         other => ("invalid", other.to_string()),

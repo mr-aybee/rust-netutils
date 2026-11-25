@@ -1,11 +1,14 @@
-use clap::Parser;
-use net_common::time::{iso8601, now_unix};
-use net_common::{Status, parse_duration};
-use portwatch::model::{Change, Filter, Scope, Snapshotter, Sock, diff};
+//! PortWatch command-line entry point.
+
 use std::io::Write;
 use std::net::IpAddr;
 use std::process::ExitCode;
 use std::time::Duration;
+
+use clap::Parser;
+use net_common::time::{iso8601, now_unix};
+use net_common::{Status, parse_duration};
+use portwatch::model::{Change, Filter, Scope, Snapshotter, Sock, diff};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -88,6 +91,7 @@ fn main() -> ExitCode {
             });
         }
     };
+
     let mut states = Vec::new();
     for s in &cli.states {
         let up = s.trim().to_ascii_uppercase().replace('-', "_");
@@ -97,6 +101,7 @@ fn main() -> ExitCode {
             "SYN_RECV" | "SYN_RECEIVED" => "SYN_RCVD".to_string(),
             _ => up,
         };
+
         if !STATES.contains(&up.as_str()) {
             eprintln!(
                 "portwatch: unknown TCP state '{s}' (expected one of {})",
@@ -104,8 +109,10 @@ fn main() -> ExitCode {
             );
             return ExitCode::from(Status::Usage.code());
         }
+
         states.push(up);
     }
+
     let filter = Filter {
         ports: cli.ports.clone(),
         local_ports: cli.local_ports.clone(),
@@ -137,8 +144,10 @@ fn main() -> ExitCode {
             return ExitCode::from(Status::Failure.code());
         }
     };
+
     if !cli.watch {
         print_list(&current, cli.json, cli.quiet);
+
         // Like grep: no match is status 1, so `portwatch -p 8080` answers "is anything there?".
         return ExitCode::from(if current.is_empty() {
             Status::Failure.code()
@@ -154,9 +163,12 @@ fn main() -> ExitCode {
             cli.interval
         );
     }
+
     let mut previous = current;
+
     loop {
         std::thread::sleep(cli.interval);
+
         let now = match take() {
             Ok(s) => s,
             Err(e) => {
@@ -164,8 +176,10 @@ fn main() -> ExitCode {
                 continue;
             }
         };
+
         let time = iso8601(now_unix());
         let mut out = std::io::stdout().lock();
+
         for change in diff(&previous, &now) {
             let line = if cli.json {
                 let mut v = serde_json::to_value(&change).unwrap_or_default();
@@ -180,10 +194,12 @@ fn main() -> ExitCode {
                     }
                 }
             };
+
             if writeln!(out, "{line}").is_err() {
                 return ExitCode::from(Status::Ok.code());
             }
         }
+
         previous = now;
     }
 }
@@ -213,6 +229,7 @@ fn row(s: &Sock) -> String {
         Some(r) => r.to_string(),
         None => "*".to_string(),
     };
+
     format!(
         "{:<4} {:<45} {:<45} {:<11} {}",
         s.proto.to_string(),
@@ -225,11 +242,14 @@ fn row(s: &Sock) -> String {
 
 fn print_list(socks: &[Sock], json: bool, quiet: bool) {
     let mut out = std::io::stdout().lock();
+
     if json {
         let doc = serde_json::json!({"version": 1, "sockets": socks, "count": socks.len()});
         let _ = writeln!(out, "{doc:#}");
+
         return;
     }
+
     if !quiet {
         let _ = writeln!(
             out,
@@ -237,14 +257,17 @@ fn print_list(socks: &[Sock], json: bool, quiet: bool) {
             "PROTO", "LOCAL", "REMOTE", "STATE"
         );
     }
+
     for s in socks {
         if writeln!(out, "{}", row(s)).is_err() {
             return;
         }
     }
+
     if !quiet {
         let hidden = socks.iter().filter(|s| s.pids.is_empty()).count();
         let _ = writeln!(out, "{} socket(s)", socks.len());
+
         if hidden > 0 {
             eprintln!(
                 "portwatch: owner unknown for {hidden} socket(s); other users' processes need elevated privileges"

@@ -1,11 +1,12 @@
 //! Microbenchmarks for hot, allocation-sensitive helpers.
 
+use std::hint::black_box;
+
 use criterion::{Criterion, criterion_group, criterion_main};
 use netprobe::probe::{http, icmp};
 use netprobe::stats::summarize;
 use netprobe::target::parse_endpoint;
 use netprobe::url::parse_url;
-use std::hint::black_box;
 
 fn bench(c: &mut Criterion) {
     c.bench_function("parse_endpoint/hostname", |b| {

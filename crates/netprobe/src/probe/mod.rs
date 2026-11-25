@@ -6,16 +6,19 @@ pub mod icmp;
 pub mod tcp;
 pub mod udp;
 
-use serde::Serialize;
 use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
+
+use serde::Serialize;
 
 /// Outcome of a single probe attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Outcome {
+    /// The probe succeeded.
     Ok,
+    /// The probe failed (refused, timed out, unexpected response...).
     Failed,
     /// The probe ran but its result cannot be determined (e.g. UDP silence).
     Inconclusive,
@@ -24,12 +27,16 @@ pub enum Outcome {
 /// Timing breakdown in milliseconds; absent phases are omitted.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Timings {
+    /// Name resolution time.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dns_ms: Option<f64>,
+    /// TCP connect time.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub connect_ms: Option<f64>,
+    /// TLS handshake time.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tls_ms: Option<f64>,
+    /// Time from sending the request to the first response byte.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub first_byte_ms: Option<f64>,
 }
@@ -37,18 +44,26 @@ pub struct Timings {
 /// Result of one probe attempt.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ProbeResult {
+    /// Probe name: `tcp`, `dns`, `http`, `udp` or `icmp`.
     pub probe: &'static str,
+    /// Probed target as displayed.
     pub target: String,
+    /// Attempt number, starting at 1.
     pub seq: u32,
+    /// Outcome of the attempt.
     pub outcome: Outcome,
     /// Total wall time of the attempt.
     pub elapsed_ms: f64,
+    /// Address actually contacted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub address: Option<SocketAddr>,
+    /// Per-phase timings.
     #[serde(skip_serializing_if = "is_default")]
     pub timings: Timings,
+    /// Extra information, e.g. HTTP status or reply size.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+    /// Failure reason.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     /// Answer records (DNS) in canonical order.
@@ -61,6 +76,7 @@ fn is_default(t: &Timings) -> bool {
 }
 
 impl ProbeResult {
+    /// A failed result with no timings, to be filled in by the probe.
     pub fn new(probe: &'static str, target: String, seq: u32) -> Self {
         Self {
             probe,

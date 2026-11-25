@@ -12,12 +12,14 @@ fn main() {
     let l = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = l.local_addr().unwrap();
     let mut held = Vec::with_capacity(n * 2);
+
     for _ in 0..n {
         let c = TcpStream::connect(addr).unwrap();
         let (s, _) = l.accept().unwrap();
         held.push(c);
         held.push(s);
     }
+
     println!("ready {} sockets on port {}", held.len() + 1, addr.port());
     std::thread::park();
 }

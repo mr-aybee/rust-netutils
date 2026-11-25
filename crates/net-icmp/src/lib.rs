@@ -8,10 +8,11 @@
 //! If neither is permitted the probe fails with an explanatory error. There is
 //! never a silent fallback to another protocol.
 
-use socket2::{Domain, Protocol, Socket, Type};
 use std::io;
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
+
+use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
 
 const ECHO_REQUEST_V4: u8 = 8;
@@ -26,9 +27,12 @@ const TIME_EXCEEDED_V6: u8 = 3;
 /// Bytes of payload carried in each echo request.
 pub const PAYLOAD_LEN: usize = 32;
 
+/// Which kind of socket an [`IcmpSocket`] uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SocketKind {
+    /// Unprivileged datagram ICMP socket.
     Datagram,
+    /// Raw ICMP socket (requires privileges).
     Raw,
     /// Windows IP Helper API (`IcmpSendEcho`), unprivileged.
     WindowsApi,
@@ -43,6 +47,7 @@ pub struct IcmpSocket {
 }
 
 impl IcmpSocket {
+    /// Kind of socket in use.
     pub fn kind(&self) -> SocketKind {
         self.kind
     }
@@ -70,12 +75,14 @@ impl IcmpSocket {
         } else {
             (Domain::IPV4, Protocol::ICMPV4)
         };
+
         let attempt = |ty: Type| -> io::Result<UdpSocket> {
             let s = Socket::new(domain, ty, Some(proto))?;
             s.set_nonblocking(true)?;
             let std: std::net::UdpSocket = s.into();
             UdpSocket::from_std(std)
         };
+
         let dgram_err = match attempt(Type::DGRAM) {
             Ok(sock) => {
                 return Ok(Self {
@@ -86,6 +93,7 @@ impl IcmpSocket {
             }
             Err(e) => e,
         };
+
         match attempt(Type::RAW) {
             Ok(sock) => Ok(Self {
                 sock: Some(sock),
@@ -103,6 +111,7 @@ fn permission_hint(dgram: &io::Error, raw: &io::Error) -> String {
         describe_io(dgram),
         describe_io(raw)
     );
+
     if cfg!(target_os = "linux") {
         format!(
             "{base}. Allow unprivileged ping with `sysctl -w net.ipv4.ping_group_range=\"0 2147483647\"`, run as root, or grant CAP_NET_RAW"
@@ -120,9 +129,11 @@ pub fn checksum(data: &[u8]) -> u16 {
         .chunks(2)
         .map(|c| u32::from(u16::from_be_bytes([c[0], *c.get(1).unwrap_or(&0)])))
         .sum();
+
     while sum >> 16 != 0 {
         sum = (sum & 0xffff) + (sum >> 16);
     }
+
     !(sum as u16)
 }
 
@@ -132,13 +143,16 @@ pub fn build_echo(v6: bool, id: u16, seq: u16) -> Vec<u8> {
     p[0] = if v6 { ECHO_REQUEST_V6 } else { ECHO_REQUEST_V4 };
     p[4..6].copy_from_slice(&id.to_be_bytes());
     p[6..8].copy_from_slice(&seq.to_be_bytes());
+
     for (i, b) in p[8..].iter_mut().enumerate() {
         *b = b'a' + (i % 26) as u8;
     }
+
     if !v6 {
         let c = checksum(&p);
         p[2..4].copy_from_slice(&c.to_be_bytes());
     }
+
     p
 }
 
@@ -150,15 +164,23 @@ fn strip_ipv4_header(buf: &[u8]) -> &[u8] {
             return &buf[ihl..];
         }
     }
+
     buf
 }
 
 /// What a received ICMP message means for our request.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Reply {
-    Echo { len: usize },
+    /// Matching echo reply.
+    Echo {
+        /// ICMP message size in bytes.
+        len: usize,
+    },
+    /// Destination unreachable for our request, with the ICMP code.
     Unreachable(u8),
+    /// Time to live exceeded for our request.
     TimeExceeded,
+    /// A message for some other request.
     Unrelated,
 }
 
@@ -170,19 +192,23 @@ pub fn classify(v6: bool, raw_buf: &[u8], id: u16, seq: u16, check_id: bool) -> 
     } else {
         strip_ipv4_header(raw_buf)
     };
+
     if msg.len() < 8 {
         return Reply::Unrelated;
     }
+
     let matches = |m: &[u8]| {
         m.len() >= 8
             && u16::from_be_bytes([m[6], m[7]]) == seq
             && (!check_id || u16::from_be_bytes([m[4], m[5]]) == id)
     };
+
     let (reply, unreach, exceeded) = if v6 {
         (ECHO_REPLY_V6, UNREACHABLE_V6, TIME_EXCEEDED_V6)
     } else {
         (ECHO_REPLY_V4, UNREACHABLE_V4, TIME_EXCEEDED_V4)
     };
+
     let t = msg[0];
     if t == reply {
         return if matches(msg) {
@@ -191,14 +217,17 @@ pub fn classify(v6: bool, raw_buf: &[u8], id: u16, seq: u16, check_id: bool) -> 
             Reply::Unrelated
         };
     }
+
     if t == unreach || t == exceeded {
         // Error messages embed the offending packet after the 8-byte header.
         let inner = &msg[8..];
+
         let inner_icmp = if v6 {
             inner.get(40..)
         } else {
             Some(strip_ipv4_header(inner)).filter(|i| i.len() < inner.len())
         };
+
         let ours = inner_icmp.is_some_and(matches);
         if ours || !check_id {
             return if t == unreach {
@@ -208,6 +237,7 @@ pub fn classify(v6: bool, raw_buf: &[u8], id: u16, seq: u16, check_id: bool) -> 
             };
         }
     }
+
     Reply::Unrelated
 }
 
@@ -234,8 +264,13 @@ fn describe_io(e: &io::Error) -> String {
 /// Result of one echo exchange.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Echo {
-    /// Echo reply received after `rtt`; `bytes` is the ICMP message size.
-    Reply { rtt: Duration, bytes: usize },
+    /// Echo reply received.
+    Reply {
+        /// Round-trip time.
+        rtt: Duration,
+        /// ICMP message size in bytes.
+        bytes: usize,
+    },
     /// No reply before the deadline.
     NoReply,
     /// Unreachable, TTL exceeded, or a local error.
@@ -249,14 +284,18 @@ impl IcmpSocket {
         let Some(socket) = self.sock.as_ref() else {
             return echo_windows_api(ip, wait).await;
         };
+
         let packet = build_echo(self.v6, id, seq);
         let start = Instant::now();
         let deadline = start + wait;
+
         if let Err(e) = socket.send_to(&packet, SocketAddr::new(ip, 0)).await {
             return Echo::Error(format!("send failed: {}", describe_io(&e)));
         }
+
         let raw = self.kind == SocketKind::Raw;
         let mut buf = [0u8; 1500];
+
         loop {
             let (n, from) =
                 match tokio::time::timeout_at(deadline.into(), socket.recv_from(&mut buf)).await {
@@ -264,6 +303,7 @@ impl IcmpSocket {
                     Ok(Err(e)) => return Echo::Error(describe_io(&e)),
                     Ok(Ok(v)) => v,
                 };
+
             match classify(self.v6, &buf[..n], id, seq, raw) {
                 // Raw sockets see every ICMP message on the host: require the reply to come from the target.
                 Reply::Echo { .. } if raw && from.ip() != ip => continue,
@@ -286,8 +326,14 @@ impl IcmpSocket {
 /// Kind of ICMP message relevant to an echo exchange.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MsgKind {
-    EchoReply { len: usize },
+    /// Echo reply.
+    EchoReply {
+        /// ICMP message size in bytes.
+        len: usize,
+    },
+    /// Destination unreachable, with the ICMP code.
     Unreachable(u8),
+    /// Time to live exceeded in transit.
     TimeExceeded,
 }
 
@@ -295,8 +341,11 @@ pub enum MsgKind {
 /// (for error messages, those of the embedded original echo request).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Parsed {
+    /// What kind of message this is.
     pub kind: MsgKind,
+    /// ICMP identifier of the request concerned.
     pub id: u16,
+    /// ICMP sequence number of the request concerned.
     pub seq: u16,
 }
 
@@ -307,9 +356,11 @@ pub fn parse(v6: bool, raw_buf: &[u8]) -> Option<Parsed> {
     } else {
         strip_ipv4_header(raw_buf)
     };
+
     if msg.len() < 8 {
         return None;
     }
+
     let ids = |m: &[u8]| {
         (m.len() >= 8).then(|| {
             (
@@ -318,11 +369,13 @@ pub fn parse(v6: bool, raw_buf: &[u8]) -> Option<Parsed> {
             )
         })
     };
+
     let (reply, unreach, exceeded) = if v6 {
         (ECHO_REPLY_V6, UNREACHABLE_V6, TIME_EXCEEDED_V6)
     } else {
         (ECHO_REPLY_V4, UNREACHABLE_V4, TIME_EXCEEDED_V4)
     };
+
     let t = msg[0];
     if t == reply {
         let (id, seq) = ids(msg)?;
@@ -332,21 +385,27 @@ pub fn parse(v6: bool, raw_buf: &[u8]) -> Option<Parsed> {
             seq,
         });
     }
+
     if t == unreach || t == exceeded {
         let inner = &msg[8..];
+
         let inner_icmp = if v6 {
             inner.get(40..)?
         } else {
             Some(strip_ipv4_header(inner)).filter(|i| i.len() < inner.len())?
         };
+
         let (id, seq) = ids(inner_icmp)?;
+
         let kind = if t == unreach {
             MsgKind::Unreachable(msg[1])
         } else {
             MsgKind::TimeExceeded
         };
+
         return Some(Parsed { kind, id, seq });
     }
+
     None
 }
 
@@ -388,6 +447,7 @@ impl Pinger {
         })
     }
 
+    /// Kind of the shared socket.
     pub fn kind(&self) -> SocketKind {
         self.inner.kind
     }
@@ -397,7 +457,9 @@ impl Pinger {
         let Some(socket) = self.inner.sock.as_ref() else {
             return echo_windows_api(ip, wait).await;
         };
+
         let (tx, rx) = tokio::sync::oneshot::channel();
+
         // Pick a sequence number not currently in flight.
         let seq = {
             let Ok(mut w) = self.waiters.lock() else {
@@ -412,6 +474,7 @@ impl Pinger {
                     .next_seq
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 tries += 1;
+
                 if tries > u32::from(u16::MAX) {
                     return Echo::Error("too many requests in flight".into());
                 }
@@ -421,6 +484,7 @@ impl Pinger {
         };
         let packet = build_echo(self.inner.v6, self.id, seq);
         let start = Instant::now();
+
         let result = match socket.send_to(&packet, SocketAddr::new(ip, 0)).await {
             Err(e) => Echo::Error(format!("send failed: {}", describe_io(&e))),
             Ok(_) => match tokio::time::timeout(wait, rx).await {
@@ -436,9 +500,11 @@ impl Pinger {
                 Err(_) => Echo::NoReply,
             },
         };
+
         if let Ok(mut w) = self.waiters.lock() {
             w.remove(&seq);
         }
+
         result
     }
 }
@@ -455,20 +521,26 @@ async fn receive_loop(sock: std::sync::Arc<IcmpSocket>, waiters: std::sync::Arc<
     let Some(socket) = sock.sock.as_ref() else {
         return;
     };
+
     let raw = sock.kind == SocketKind::Raw;
     let mut buf = [0u8; 1500];
+
     loop {
         let Ok((n, from)) = socket.recv_from(&mut buf).await else {
             continue;
         };
+
         let at = Instant::now();
+
         let Some(p) = parse(sock.v6, &buf[..n]) else {
             continue;
         };
+
         // Datagram sockets: the kernel rewrites the identifier and filters per socket.
         if raw && p.id != id {
             continue;
         }
+
         let Ok(mut w) = waiters.lock() else { return };
         let matches = match (w.get(&p.seq), p.kind) {
             // Echo replies must come from the probed address; errors come from routers.
@@ -476,6 +548,7 @@ async fn receive_loop(sock: std::sync::Arc<IcmpSocket>, waiters: std::sync::Arc<
             (Some(_), _) => true,
             (None, _) => false,
         };
+
         if matches && let Some((_, tx)) = w.remove(&p.seq) {
             let _ = tx.send((p.kind, at));
         }
@@ -486,6 +559,7 @@ async fn receive_loop(sock: std::sync::Arc<IcmpSocket>, waiters: std::sync::Arc<
 async fn echo_windows_api(ip: IpAddr, wait: Duration) -> Echo {
     let payload = build_echo(false, 0, 0)[8..].to_vec();
     let start = Instant::now();
+
     // IcmpSendEcho blocks; run it on the blocking pool so other tasks proceed.
     match tokio::task::spawn_blocking(move || windows::echo(ip, &payload, wait)).await {
         Ok(windows::Echo::Reply { bytes }) => Echo::Reply {

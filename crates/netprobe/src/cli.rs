@@ -1,8 +1,9 @@
 //! Command-line interface definition.
 
+use std::time::Duration;
+
 use clap::{Args, Parser, Subcommand};
 use net_common::parse_duration;
-use std::time::Duration;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -11,6 +12,7 @@ use std::time::Duration;
     about = "Multi-protocol network diagnostics",
     propagate_version = true
 )]
+/// Parsed command line.
 pub struct Cli {
     /// Emit a single JSON document on stdout instead of human-readable text.
     #[arg(long, global = true)]
@@ -21,16 +23,19 @@ pub struct Cli {
     /// Show timing breakdown for every attempt.
     #[arg(short, long, global = true)]
     pub verbose: bool,
+    /// Selected subcommand.
     #[command(subcommand)]
     pub command: Command,
 }
 
+/// Available probes.
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Test TCP connectivity (resolve + connect) to HOST:PORT.
     Tcp {
         /// Target as HOST:PORT or [IPv6]:PORT.
         target: String,
+        /// Attempt count, interval and timeout.
         #[command(flatten)]
         common: Common,
     },
@@ -50,6 +55,7 @@ pub enum Command {
         /// DANGEROUS: skip certificate chain and hostname verification.
         #[arg(long, conflicts_with = "ca_file")]
         insecure: bool,
+        /// Attempt count, interval and timeout.
         #[command(flatten)]
         common: Common,
     },
@@ -63,6 +69,7 @@ pub enum Command {
         /// Payload as hex digits (whitespace ignored).
         #[arg(long)]
         payload_hex: Option<String>,
+        /// Attempt count, interval and timeout.
         #[command(flatten)]
         common: Common,
     },
@@ -70,6 +77,7 @@ pub enum Command {
     Icmp {
         /// Host name or IP address.
         host: String,
+        /// Attempt count, interval and timeout.
         #[command(flatten)]
         common: Common,
     },
@@ -83,6 +91,7 @@ pub enum Command {
         /// Additional PEM file of trusted CA certificates for https jobs.
         #[arg(long, value_name = "PEM")]
         ca_file: Option<std::path::PathBuf>,
+        /// Attempt count, interval and timeout.
         #[command(flatten)]
         common: Common,
     },
@@ -96,11 +105,13 @@ pub enum Command {
         /// Query this resolver (IP or IP:PORT, default port 53) instead of the system resolver.
         #[arg(short, long)]
         server: Option<String>,
+        /// Attempt count, interval and timeout.
         #[command(flatten)]
         common: Common,
     },
 }
 
+/// Options shared by every probe.
 #[derive(Debug, Clone, Args)]
 pub struct Common {
     /// Per-attempt deadline (e.g. 500ms, 3s).

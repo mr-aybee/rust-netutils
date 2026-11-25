@@ -1,15 +1,16 @@
 //! End-to-end tests against local TLS servers backed by a generated PKI.
 #![allow(clippy::unwrap_used)] // Test fixtures: panicking on setup failure is the desired behavior.
 
-use assert_cmd::Command;
-use predicates::prelude::*;
-use rcgen::{BasicConstraints, CertificateParams, CertifiedIssuer, DnType, IsCa, KeyPair};
-use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
+
+use assert_cmd::Command;
+use predicates::prelude::*;
+use rcgen::{BasicConstraints, CertificateParams, CertifiedIssuer, DnType, IsCa, KeyPair};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use time::{Duration, OffsetDateTime};
 
 fn certwatch() -> Command {
@@ -91,11 +92,14 @@ fn serve(
     thread::spawn(move || {
         for s in l.incoming().take(conns) {
             let Ok(mut tcp) = s else { continue };
+
             let Ok(mut conn) = rustls::ServerConnection::new(Arc::clone(&config)) else {
                 continue;
             };
+
             let mut tls = rustls::Stream::new(&mut conn, &mut tcp);
             let mut buf = [0u8; 64];
+
             // Drive the handshake; the client closes without sending data.
             let _ = tls.read(&mut buf);
             let _ = tls.flush();
@@ -202,6 +206,7 @@ fn hostname_mismatch_via_sni() {
 fn untrusted_and_incomplete_chain() {
     let pki = pki("untrusted");
     let (cert, key) = leaf(&pki, -1, 90);
+
     // Full chain but root not trusted (system roots only).
     let full = serve(
         vec![cert.clone(), pki.intermediate.der().clone()],
@@ -213,6 +218,7 @@ fn untrusted_and_incomplete_chain() {
         .assert()
         .code(1)
         .stdout(predicate::str::contains("unknown issuer"));
+
     // Root trusted, but server omits the intermediate.
     let incomplete = serve(vec![cert], key, 1);
     trusted(
@@ -230,6 +236,7 @@ fn untrusted_and_incomplete_chain() {
 #[test]
 fn chain_expiry_includes_intermediate() {
     let pki = pki("intermediate");
+
     // Short-lived intermediate.
     let mut p = ca_params("Short Intermediate");
     p.not_after = OffsetDateTime::now_utc() + Duration::days(5);

@@ -2,10 +2,11 @@
 //! so the deterministic tests use TCP mode).
 #![allow(clippy::unwrap_used)] // Test fixtures: panicking on setup failure is the desired behavior.
 
-use assert_cmd::Command;
-use predicates::prelude::*;
 use std::net::TcpListener;
 use std::time::Duration;
+
+use assert_cmd::Command;
+use predicates::prelude::*;
 
 fn meshping() -> Command {
     let mut c = Command::cargo_bin("meshping").unwrap();

@@ -1,15 +1,19 @@
 //! Per-host probing: ICMP echo or TCP connect timing.
 
-use net_icmp::{Echo, Pinger};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use net_icmp::{Echo, Pinger};
 use tokio::net::TcpStream;
 
+/// Probe method actually used for a host.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Mode {
+    /// ICMP echo.
     Icmp,
+    /// TCP connect timing.
     Tcp,
 }
 
@@ -26,14 +30,18 @@ impl std::fmt::Display for Mode {
 pub enum Prober {
     /// Shared per address family: one socket, replies demultiplexed by sequence.
     Icmp {
+        /// Shared ICMP socket for this host's address family.
         pinger: Arc<Pinger>,
     },
+    /// TCP connect timing to a port.
     Tcp {
+        /// Port to connect to.
         port: u16,
     },
 }
 
 impl Prober {
+    /// Probe method of this prober.
     pub fn mode(&self) -> Mode {
         match self {
             Prober::Icmp { .. } => Mode::Icmp,
@@ -54,6 +62,7 @@ impl Prober {
             },
             Prober::Tcp { port } => {
                 let start = Instant::now();
+
                 match tokio::time::timeout(timeout, TcpStream::connect(SocketAddr::new(ip, *port)))
                     .await
                 {

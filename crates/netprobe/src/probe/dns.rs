@@ -1,15 +1,17 @@
 //! DNS probe using hickory-resolver with caching disabled so every attempt
 //! performs a real query.
 
-use super::{Outcome, ProbeResult, ms};
+use std::net::SocketAddr;
+use std::str::FromStr;
+use std::time::{Duration, Instant};
+
 use hickory_resolver::TokioResolver;
 use hickory_resolver::config::{NameServerConfig, ResolverConfig, ResolverOpts};
 use hickory_resolver::net::NetError;
 use hickory_resolver::net::runtime::TokioRuntimeProvider;
 use hickory_resolver::proto::rr::RecordType;
-use std::net::SocketAddr;
-use std::str::FromStr;
-use std::time::{Duration, Instant};
+
+use super::{Outcome, ProbeResult, ms};
 
 /// Record types supported by the probe.
 pub const SUPPORTED: &[&str] = &[
@@ -25,6 +27,7 @@ pub fn parse_record_type(s: &str) -> Result<RecordType, String> {
             SUPPORTED.join(", ")
         ));
     }
+
     RecordType::from_str(&up).map_err(|e| e.to_string())
 }
 
@@ -34,12 +37,14 @@ pub fn build_resolver(
     timeout: Duration,
 ) -> Result<TokioResolver, String> {
     let provider = TokioRuntimeProvider::default();
+
     let mut builder = match server {
         Some(addr) => {
             let mut ns = NameServerConfig::udp_and_tcp(addr.ip());
             for conn in &mut ns.connections {
                 conn.port = addr.port();
             }
+
             TokioResolver::builder_with_config(
                 ResolverConfig::from_parts(None, vec![], vec![ns]),
                 provider,
@@ -48,6 +53,7 @@ pub fn build_resolver(
         None => TokioResolver::builder(provider)
             .map_err(|e| format!("cannot read system DNS configuration: {e}"))?,
     };
+
     let opts: &mut ResolverOpts = builder.options_mut();
     opts.cache_size = 0;
     opts.attempts = 1;
@@ -67,6 +73,7 @@ fn describe(e: &NetError) -> String {
     }
 }
 
+/// Query `name`/`rtype` once and record the answers and latency.
 pub async fn probe(
     resolver: &TokioResolver,
     name: &str,
@@ -75,6 +82,7 @@ pub async fn probe(
 ) -> ProbeResult {
     let mut r = ProbeResult::new("dns", format!("{name} {rtype}"), seq);
     let start = Instant::now();
+
     match resolver.lookup(name, rtype).await {
         Ok(lookup) => {
             let mut answers: Vec<String> = lookup
@@ -82,6 +90,7 @@ pub async fn probe(
                 .iter()
                 .map(|rec| format!("{} {} {}", rec.record_type(), rec.ttl, rec.data))
                 .collect();
+
             // Canonical order so repeated runs and diffs are stable.
             answers.sort_unstable();
             r.outcome = Outcome::Ok;
@@ -90,6 +99,7 @@ pub async fn probe(
         }
         Err(e) => r.error = Some(describe(&e)),
     }
+
     r.elapsed_ms = ms(start.elapsed());
     r.timings.dns_ms = Some(r.elapsed_ms);
     r

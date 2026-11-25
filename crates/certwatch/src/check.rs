@@ -1,27 +1,34 @@
 //! Remote certificate check: connect, handshake, evaluate policy.
 
-use crate::cert::{self, CertInfo};
-use crate::tls::{RecordingVerifier, classify};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
 use net_common::target::Endpoint;
 use rustls::client::WebPkiServerVerifier;
 use rustls::pki_types::ServerName;
 use serde::Serialize;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
 use tokio::net::{TcpStream, lookup_host};
+
+use crate::cert::{self, CertInfo};
+use crate::tls::{RecordingVerifier, classify};
 
 /// Overall verdict for one target, ordered by severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Verdict {
+    /// Chain valid and nothing expires within the warning threshold.
     Ok,
+    /// Valid, but a certificate expires within the warning threshold.
     Warning,
+    /// Validation failed or a certificate expires within the critical threshold.
     Critical,
+    /// No certificate could be obtained (DNS, connect, timeout or handshake failure).
     Error,
 }
 
 impl Verdict {
+    /// Upper-case label used in human output.
     pub fn label(self) -> &'static str {
         match self {
             Verdict::Ok => "OK",
@@ -35,18 +42,26 @@ impl Verdict {
 /// Expiry thresholds in days.
 #[derive(Debug, Clone, Copy)]
 pub struct Policy {
+    /// Days before expiry at which a certificate becomes a warning.
     pub warn_days: i64,
+    /// Days before expiry at which a certificate becomes critical.
     pub crit_days: i64,
 }
 
+/// Outcome of checking one target or inspecting one file.
 #[derive(Debug, Clone, Serialize)]
 pub struct CheckResult {
+    /// Target as `HOST:PORT`, or the file path for `inspect`.
     pub target: String,
+    /// Overall verdict.
     pub verdict: Verdict,
+    /// Address actually connected to.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub address: Option<SocketAddr>,
+    /// Server name sent in the TLS handshake and validated.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sni: Option<String>,
+    /// Negotiated protocol version, e.g. `TLS 1.3`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tls_version: Option<String>,
     /// Chain validation passed (trust, hostname, validity period). Absent for local files.
@@ -55,6 +70,7 @@ pub struct CheckResult {
     /// Category of the validation failure (`expired`, `hostname_mismatch`, `untrusted`, ...).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub validation_error_kind: Option<&'static str>,
+    /// Human-readable problems: validation errors, expiry and weaknesses.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub problems: Vec<String>,
     /// Days until the leaf certificate expires.
@@ -66,10 +82,12 @@ pub struct CheckResult {
     /// Presented chain, leaf first.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub chain: Vec<CertInfo>,
+    /// Wall time spent on this target, in milliseconds.
     pub elapsed_ms: f64,
 }
 
 impl CheckResult {
+    /// Result for a target where no certificate could be obtained.
     pub fn error(target: String, msg: String, start: Instant) -> Self {
         Self {
             target,
@@ -88,6 +106,7 @@ impl CheckResult {
     }
 }
 
+/// Current time as Unix seconds.
 pub fn now_unix() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -104,6 +123,7 @@ pub fn evaluate(
     let mut problems = Vec::new();
     let mut verdict = Verdict::Ok;
     let leaf_days = chain.first().map(|c| c.days_left);
+
     // The root is not normally sent; if a self-signed CA is in the chain, ignore it for expiry.
     let chain_days = chain
         .iter()
@@ -115,12 +135,14 @@ pub fn evaluate(
         problems.push(msg.clone());
         verdict = verdict.max(Verdict::Critical);
     }
+
     if let Some(days) = chain_days {
         let which = if chain_days == leaf_days {
             "certificate"
         } else {
             "a certificate in the chain"
         };
+
         if days < 0 {
             problems.push(format!("{which} expired {} day(s) ago", -days));
             verdict = verdict.max(Verdict::Critical);
@@ -138,9 +160,11 @@ pub fn evaluate(
             verdict = verdict.max(Verdict::Warning);
         }
     }
+
     if let Some(leaf) = chain.first() {
         problems.extend(cert::weaknesses(leaf));
     }
+
     // Problems are deduplicated so an expired leaf is not reported twice.
     problems.dedup();
     (verdict, problems, leaf_days, chain_days)
@@ -156,6 +180,7 @@ pub async fn check(
 ) -> CheckResult {
     let start = Instant::now();
     let target = ep.to_string();
+
     match tokio::time::timeout(deadline, check_inner(ep, sni, verifier, policy, start)).await {
         Ok(r) => r,
         Err(_) => CheckResult::error(
@@ -182,12 +207,15 @@ async fn check_inner(
     start: Instant,
 ) -> CheckResult {
     let target = ep.to_string();
+
     let addrs: Vec<SocketAddr> = match lookup_host((ep.host.as_str(), ep.port)).await {
         Ok(a) => a.collect(),
         Err(e) => return CheckResult::error(target, format!("resolve failed: {e}"), start),
     };
+
     let mut last_err = None;
     let mut conn = None;
+
     for addr in &addrs {
         match TcpStream::connect(addr).await {
             Ok(s) => {
@@ -197,6 +225,7 @@ async fn check_inner(
             Err(e) => last_err = Some(e),
         }
     }
+
     let Some((stream, addr)) = conn else {
         let msg = last_err.map_or_else(
             || "no addresses found".to_string(),
@@ -216,11 +245,13 @@ async fn check_inner(
             );
         }
     };
+
     let recorder = RecordingVerifier::new(Arc::clone(verifier));
     let config = match recorder.client_config() {
         Ok(c) => c,
         Err(e) => return CheckResult::error(target, e, start),
     };
+
     let tls = match tokio_rustls::TlsConnector::from(config)
         .connect(server_name, stream)
         .await
@@ -230,9 +261,11 @@ async fn check_inner(
             let mut r = CheckResult::error(target, format!("TLS handshake failed: {e}"), start);
             r.address = Some(addr);
             r.sni = Some(name_str);
+
             return r;
         }
     };
+
     let (_, session) = tls.get_ref();
     let tls_version = session
         .protocol_version()
@@ -240,12 +273,14 @@ async fn check_inner(
     let now = now_unix();
     let mut chain = Vec::new();
     let mut parse_errors = Vec::new();
+
     for der in session.peer_certificates().unwrap_or_default() {
         match cert::parse(der, now) {
             Ok(c) => chain.push(c),
             Err(e) => parse_errors.push(e),
         }
     }
+
     // Close without sending application data.
     drop(tls);
 
@@ -254,6 +289,7 @@ async fn check_inner(
         Some(Err(e)) => Some(classify(&e)),
         None => Some(("invalid", "server presented no certificate".to_string())),
     };
+
     let kind = validation.as_ref().map(|(k, _)| *k);
     let (verdict, mut problems, days_left, chain_days_left) = evaluate(&chain, validation, policy);
     problems.extend(parse_errors);

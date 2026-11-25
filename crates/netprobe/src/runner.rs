@@ -1,17 +1,22 @@
 //! Repetition, deadlines, pacing and cancellation for probes.
 
-use crate::probe::{Outcome, ProbeResult, ms};
-use crate::stats::{Summary, summarize};
-use net_common::Status;
-use serde::Serialize;
 use std::future::Future;
 use std::time::Duration;
+
+use net_common::Status;
+use serde::Serialize;
+
+use crate::probe::{Outcome, ProbeResult, ms};
+use crate::stats::{Summary, summarize};
 
 /// How many attempts to make and how to pace them.
 #[derive(Debug, Clone, Copy)]
 pub struct Plan {
+    /// Number of attempts.
     pub count: u32,
+    /// Pause between attempts.
     pub interval: Duration,
+    /// Deadline for each attempt.
     pub timeout: Duration,
     /// Extra time beyond `timeout` before the runner aborts an attempt. Probes that
     /// enforce `timeout` themselves (UDP) use a margin so their own result wins.
@@ -21,17 +26,25 @@ pub struct Plan {
 /// Aggregate over all attempts for one target.
 #[derive(Debug, Clone, Serialize)]
 pub struct Report {
+    /// Attempts made.
     pub sent: u32,
+    /// Successful attempts.
     pub ok: u32,
+    /// Failed attempts.
     pub failed: u32,
+    /// Inconclusive attempts.
     pub inconclusive: u32,
+    /// Failed attempts as a percentage of attempts made.
     pub loss_pct: f64,
+    /// Latency statistics over successful attempts.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latency: Option<Summary>,
+    /// Whether Ctrl+C stopped the run early.
     pub interrupted: bool,
 }
 
 impl Report {
+    /// Aggregate a list of attempt results.
     pub fn from_results(results: &[ProbeResult], interrupted: bool) -> Self {
         let count = |o| results.iter().filter(|r| r.outcome == o).count() as u32;
         let (ok, failed, inconclusive) = (
@@ -65,13 +78,17 @@ impl Report {
         if self.sent == 0 {
             return Status::Failure;
         }
+
         let mut s = Status::Ok;
+
         if self.inconclusive > 0 {
             s = s.worst(Status::Inconclusive);
         }
+
         if self.failed > 0 {
             s = s.worst(Status::Failure);
         }
+
         s
     }
 }
@@ -129,6 +146,7 @@ where
             r = attempt => { on_result(&r); results.push(r); }
             () = &mut cancel => return (results, true),
         }
+
         if seq < plan.count {
             tokio::select! {
                 () = tokio::time::sleep(plan.interval) => {}

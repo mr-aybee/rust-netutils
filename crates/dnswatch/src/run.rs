@@ -1,19 +1,23 @@
 //! Polling rounds and the watch / wait / compare workflows.
 
-use crate::query::{Answer, Source, diff, query};
-use hickory_resolver::proto::rr::RecordType;
-use net_common::time::{iso8601, now_unix};
-use serde::Serialize;
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
+
+use hickory_resolver::proto::rr::RecordType;
+use net_common::time::{iso8601, now_unix};
+use serde::Serialize;
 use tokio::task::JoinSet;
+
+use crate::query::{Answer, Source, diff, query};
 
 /// One (name, type) pair to query on every source.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Query {
+    /// Domain name to query.
     pub name: String,
+    /// Record type to query.
     pub rtype: RecordType,
 }
 
@@ -36,50 +40,70 @@ pub async fn poll(
             (i, query(&s.resolver, &q.name, q.rtype).await)
         });
     };
+
     while next < total.min(concurrency.max(1)) {
         spawn(&mut set, next);
         next += 1;
     }
+
     while let Some(res) = set.join_next().await {
         if let Ok((i, a)) = res {
             out[i] = Some(a);
         }
+
         if next < total {
             spawn(&mut set, next);
             next += 1;
         }
     }
+
     out.into_iter()
         .map(|a| a.unwrap_or_else(|| Answer::Error("internal task failure".into())))
         .collect()
 }
 
+/// Kind of watch event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
+    /// First definitive answer for a name/type/server.
     Initial,
+    /// Definitive answer differs from the previous one.
     Changed,
+    /// Query failed (reported once per failure streak).
     Error,
+    /// Query succeeds again with the same answer as before the failures.
     Recovered,
 }
 
+/// One watch event, printed as a line or a JSON object.
 #[derive(Debug, Serialize)]
 pub struct Event<'a> {
+    /// Event time (ISO 8601, UTC).
     pub time: String,
+    /// Event kind.
     pub event: Kind,
+    /// Queried name.
     pub name: &'a str,
+    /// Queried record type.
     #[serde(rename = "type")]
     pub rtype: String,
+    /// Server label.
     pub server: &'a str,
+    /// Current answer.
     pub answer: &'a Answer,
+    /// Previous definitive answer, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub previous: Option<&'a Answer>,
+    /// Records present now but not before.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub added: Vec<String>,
+    /// Records present before but not now.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub removed: Vec<String>,
 }
 
+/// Print an event as a human-readable line or as one JSON object.
 pub fn emit(e: &Event<'_>, json: bool) {
     let line = if json {
         serde_json::to_string(e).unwrap_or_default()
@@ -90,10 +114,12 @@ pub fn emit(e: &Event<'_>, json: bool) {
             Kind::Error => "ERROR",
             Kind::Recovered => "RECOVERED",
         };
+
         let mut s = format!(
             "{}  {label:<9} {} {} @{}  ",
             e.time, e.name, e.rtype, e.server
         );
+
         if e.event == Kind::Changed && (!e.added.is_empty() || !e.removed.is_empty()) {
             let parts: Vec<String> = e
                 .added
@@ -107,15 +133,20 @@ pub fn emit(e: &Event<'_>, json: bool) {
         } else {
             s.push_str(&e.answer.summary());
         }
+
         s
     };
+
     let _ = writeln!(std::io::stdout().lock(), "{line}");
 }
 
 /// Settings shared by the workflows.
 pub struct Settings {
+    /// Time between polls.
     pub interval: Duration,
+    /// Maximum queries in flight.
     pub concurrency: usize,
+    /// Emit JSON Lines instead of text.
     pub json: bool,
 }
 
@@ -132,10 +163,12 @@ pub async fn watch(
     let mut ticker = tokio::time::interval(s.interval);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut changed_any = false;
+
     loop {
         ticker.tick().await;
         let answers = poll(&sources, &queries, s.concurrency).await;
         let time = iso8601(now_unix());
+
         for (i, ans) in answers.iter().enumerate() {
             let q = &queries[i / sources.len()];
             let src = &sources[i % sources.len()].label;
@@ -150,16 +183,20 @@ pub async fn watch(
                 added,
                 removed,
             };
+
             if !ans.is_definitive() {
                 // Report each failure streak once; never treat it as a change.
                 if !failing.insert(i, true).unwrap_or(false) {
                     emit(&base(Kind::Error, last.get(&i), vec![], vec![]), s.json);
                 }
+
                 continue;
             }
+
             if failing.remove(&i).unwrap_or(false) && last.get(&i) == Some(ans) {
                 emit(&base(Kind::Recovered, None, vec![], vec![]), s.json);
             }
+
             match last.get(&i) {
                 None => {
                     if !quiet_initial {
@@ -173,8 +210,10 @@ pub async fn watch(
                 }
                 Some(_) => {}
             }
+
             last.insert(i, ans.clone());
         }
+
         if until_change && changed_any {
             return true;
         }
@@ -196,11 +235,13 @@ pub async fn wait(
     want.dedup();
     let mut ticker = tokio::time::interval(s.interval);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
     loop {
         ticker.tick().await;
         let answers = poll(&sources, &queries, s.concurrency).await;
         let mut matched = 0;
         let mut pending = Vec::new();
+
         for (i, ans) in answers.iter().enumerate() {
             let q = &queries[i / sources.len()];
             let mut got: Vec<String> = ans
@@ -210,6 +251,7 @@ pub async fn wait(
                 .collect();
             got.sort_unstable();
             got.dedup();
+
             if got == want {
                 matched += 1;
             } else {
@@ -222,7 +264,9 @@ pub async fn wait(
                 ));
             }
         }
+
         let time = iso8601(now_unix());
+
         if s.json {
             let doc = serde_json::json!({"time": time, "matched": matched, "total": answers.len(), "pending": pending});
             let _ = writeln!(std::io::stdout().lock(), "{doc}");
@@ -238,6 +282,7 @@ pub async fn wait(
                 }
             );
         }
+
         if matched == answers.len() {
             return true;
         }
@@ -247,13 +292,18 @@ pub async fn wait(
 /// Result of a one-shot comparison of all sources.
 #[derive(Debug, Serialize)]
 pub struct Comparison {
+    /// Queried name.
     pub name: String,
+    /// Queried record type.
     #[serde(rename = "type")]
     pub rtype: String,
+    /// Whether every server returned the same definitive answer.
     pub consistent: bool,
+    /// Answer per server label, in `--server` order.
     pub answers: Vec<(String, Answer)>,
 }
 
+/// Query every name/type on every source once and compare the answers.
 pub async fn compare(
     sources: Arc<Vec<Source>>,
     queries: Arc<Vec<Query>>,

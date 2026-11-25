@@ -5,11 +5,17 @@ use serde::Serialize;
 /// Summary of a series of latency samples in milliseconds.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Summary {
+    /// Lowest sample.
     pub min_ms: f64,
+    /// Mean of the samples.
     pub avg_ms: f64,
+    /// Median (nearest rank).
     pub p50_ms: f64,
+    /// 95th percentile (nearest rank).
     pub p95_ms: f64,
+    /// Highest sample.
     pub max_ms: f64,
+    /// Population standard deviation.
     pub stddev_ms: f64,
 }
 
@@ -25,6 +31,7 @@ pub fn summarize(samples: &mut [f64]) -> Option<Summary> {
     if samples.is_empty() {
         return None;
     }
+
     samples.sort_by(f64::total_cmp);
     let n = samples.len() as f64;
     let avg = samples.iter().sum::<f64>() / n;

@@ -1,8 +1,6 @@
 //! End-to-end tests against programmable local DNS stubs (no internet required).
 #![allow(clippy::unwrap_used)] // Test fixtures: panicking on setup failure is the desired behavior.
 
-use assert_cmd::Command;
-use predicates::prelude::*;
 use std::collections::HashMap;
 use std::io::Read;
 use std::net::{SocketAddr, UdpSocket};
@@ -10,6 +8,9 @@ use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+
+use assert_cmd::Command;
+use predicates::prelude::*;
 
 /// What the stub answers for a name.
 #[derive(Clone)]
@@ -31,14 +32,17 @@ fn stub(zone: Zone) -> SocketAddr {
             if n < 12 {
                 continue;
             }
+
             let q = &buf[..n];
             let mut i = 12;
             let mut labels = Vec::new();
+
             while i < n && q[i] != 0 {
                 let len = q[i] as usize;
                 labels.push(String::from_utf8_lossy(&q[i + 1..i + 1 + len]).to_lowercase());
                 i += 1 + len;
             }
+
             let qtype = u16::from_be_bytes([q[i + 1], q[i + 2]]);
             let qend = i + 5;
             let name = labels.join(".");
@@ -49,15 +53,18 @@ fn stub(zone: Zone) -> SocketAddr {
                 Some(Reply::A(ips)) if qtype == 1 => (0, ips),
                 Some(Reply::A(_)) => (0, vec![]),
             };
+
             let mut r = Vec::with_capacity(128);
             r.extend_from_slice(&q[0..2]);
             r.extend_from_slice(&[0x85, 0x80 | rcode]); // QR AA RD, RA + rcode
             r.extend_from_slice(&[0, 1, 0, answers.len() as u8, 0, 0, 0, 0]);
             r.extend_from_slice(&q[12..qend]);
+
             for ip in answers {
                 r.extend_from_slice(&[0xc0, 0x0c, 0, 1, 0, 1, 0, 0, 0, 30, 0, 4]);
                 r.extend_from_slice(&ip);
             }
+
             let _ = sock.send_to(&r, peer);
         }
     });
@@ -88,17 +95,22 @@ fn run_live(args: &[&str], limit: Duration, during: impl FnOnce()) -> (Option<i3
         .unwrap();
     during();
     let start = Instant::now();
+
     let code = loop {
         if let Some(status) = child.try_wait().unwrap() {
             break status.code();
         }
+
         if start.elapsed() > limit {
             child.kill().unwrap();
             child.wait().unwrap();
+
             break None;
         }
+
         thread::sleep(Duration::from_millis(20));
     };
+
     let mut out = String::new();
     child
         .stdout
@@ -269,6 +281,7 @@ fn compare_consistent_different_and_errors() {
         Reply::A(vec![[192, 0, 2, 1], [192, 0, 2, 2]]),
     )]))
     .to_string();
+
     // Same set in a different order must still be consistent.
     let same2 = stub(zone(&[(
         "app.test",
@@ -297,6 +310,7 @@ fn compare_consistent_different_and_errors() {
         .args(["compare", "app.test", "-s", &same1, "-s", &failing])
         .assert()
         .code(3);
+
     // NODATA for a type the name lacks, NXDOMAIN for unknown names.
     dnswatch()
         .args([
