@@ -4,6 +4,7 @@
 //! every utility must apply identically: exit codes and duration parsing.
 
 pub mod target;
+pub mod time;
 
 use std::fmt;
 use std::time::Duration;
