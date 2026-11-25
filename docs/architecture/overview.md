@@ -7,8 +7,10 @@ rust-netutils/
 ├── crates/
 │   ├── net-common/   private (publish = false): exit statuses, duration/endpoint parsing, UTC time formatting
 │   ├── netprobe/     library + binary
+│   ├── net-icmp/     private (publish = false): ICMP echo engine (sockets, Windows API, shared Pinger)
 │   ├── certwatch/    library + binary
-│   └── dnswatch/     library + binary
+│   ├── dnswatch/     library + binary
+│   └── meshping/     library + binary
 ├── docs/             architecture, utility docs, benchmark reports
 └── scripts/          reproducible benchmark harnesses
 ```
@@ -73,3 +75,16 @@ flowchart LR
 | One resolver per source with the cache disabled and a single attempt | Every poll is a real query, and the timeout means exactly what it says. |
 | JSON Lines for `watch`/`wait` | Events stream into log pipelines without buffering a whole document. |
 | hickory resolver construction duplicated from netprobe (about 20 lines) instead of shared | Keeps `net-common` dependency-free; revisit if a third DNS user appears. |
+
+## net-icmp (private)
+
+Used by netprobe and meshping. It holds the socket strategy (datagram, then raw, then a clear error), packet building and parsing, the Windows IP Helper FFI (the only `unsafe` in the workspace), and `Pinger`: one shared socket with a demultiplexing receive task, for many concurrent exchanges. It was extracted when meshping became the second user, rather than duplicating `unsafe` code.
+
+## meshping
+
+| Decision | Reason |
+|---|---|
+| One task per host with staggered starts; samples go over a bounded channel to one aggregator | Even load, no burst at each tick; no shared mutable statistics. |
+| Shared `Pinger` per address family | Raw sockets receive every ICMP packet, so N sockets cost O(N²). Measured: 9.5% → 2.5% CPU for 100 hosts. |
+| TCP mode times a handshake or a refusal; never silently mixed with ICMP | Both prove reachability. Every sample is labelled with its mode. |
+| Rolling ring buffer per host plus lifetime counters | Constant memory for runs of any length. |
