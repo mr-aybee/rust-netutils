@@ -18,8 +18,9 @@ rust-netutils is a collection of single-purpose command-line tools for developer
 |---|---|---|
 | [**netprobe**](docs/utilities/netprobe.md) | ✅ 0.2.0 | TCP, DNS, HTTP(S), UDP and ICMP diagnostics with timing breakdowns |
 | [**certwatch**](docs/utilities/certwatch.md) | ✅ 0.1.0 | TLS certificate inspection and expiry monitoring for many endpoints |
+| [**dnswatch**](docs/utilities/dnswatch.md) | ✅ 0.1.0 | DNS change monitoring, propagation waiting and resolver comparison |
 
-More utilities (multi-host latency, DNS change monitoring, socket inspection and others) will be added here only once they are implemented and tested.
+More utilities (multi-host latency, socket inspection and others) will be added here only once they are implemented and tested.
 
 ## Key features
 
@@ -65,17 +66,18 @@ certwatch check vault.internal:8200 --ca-file root.pem -v   # inspect a private-
 
 - **CI/CD smoke tests**: check that a deployment answers on the right port with the right status code. The exit code fails the pipeline.
 - **Firewall and security-group debugging**: distinguish *refused*, *timed out* and *unreachable*.
-- **DNS migrations**: query the old and new resolvers directly and compare the answers.
+- **DNS migrations**: compare old and new resolvers with `dnswatch compare`, and block a cut-over script until a change has propagated with `dnswatch wait`.
 - **Certificate hygiene**: find certificates that are expiring, expired, untrusted, hostname-mismatched or served with an incomplete chain across an inventory of endpoints, before users notice.
 
 ## Performance
 
-Measured on an Intel Xeon E5-2620 v2 running Linux. Full methodology: [netprobe](docs/benchmarks/netprobe.md), [certwatch](docs/benchmarks/certwatch.md).
+Measured on an Intel Xeon E5-2620 v2 running Linux. Full methodology: [netprobe](docs/benchmarks/netprobe.md), [certwatch](docs/benchmarks/certwatch.md), [dnswatch](docs/benchmarks/dnswatch.md).
 
 | Utility | Workload | Result | Peak RSS | Startup | Binary |
 |---|---|---|---|---|---|
 | netprobe | 10,000 loopback TCP probes, concurrency 64 | 4,386–6,410 probes/s | 17 MiB | 4.6 ms | 3.9 MiB |
 | certwatch | 100 loopback TLS endpoints, concurrency 20 | 0.20–0.22 s total | 5.4 MiB | 3.8 ms | 2.7 MiB |
+| dnswatch | 1,000 DNS queries to a local stub, concurrency 64 | 0.12–0.13 s total | 5.9 MiB | 3.7 ms | 2.4 MiB |
 
 ## Architecture
 

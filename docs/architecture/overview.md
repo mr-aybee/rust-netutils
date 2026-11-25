@@ -5,9 +5,10 @@
 ```text
 rust-netutils/
 ├── crates/
-│   ├── net-common/   private (publish = false): exit statuses, duration and endpoint parsing
+│   ├── net-common/   private (publish = false): exit statuses, duration/endpoint parsing, UTC time formatting
 │   ├── netprobe/     library + binary
-│   └── certwatch/    library + binary
+│   ├── certwatch/    library + binary
+│   └── dnswatch/     library + binary
 ├── docs/             architecture, utility docs, benchmark reports
 └── scripts/          reproducible benchmark harnesses
 ```
@@ -62,3 +63,13 @@ flowchart LR
 | `x509-parser` for certificate details; `ring` for fingerprints | Mature parser; `ring` is already in the tree through rustls. |
 | Separate `Warning` exit code (4) | CI can treat "expiring soon" differently from "broken". |
 | Dates formatted with an internal civil-calendar routine | Avoids a date/time dependency for a single conversion. |
+
+## dnswatch
+
+| Decision | Reason |
+|---|---|
+| Four answer states (records / NXDOMAIN / NODATA / error); only definitive states can change | Prevents false alerts from transient SERVFAILs and timeouts, which are the most common noise when monitoring DNS. |
+| Canonical sorted record strings with TTL removed | Reordering and TTL countdown are not changes. |
+| One resolver per source with the cache disabled and a single attempt | Every poll is a real query, and the timeout means exactly what it says. |
+| JSON Lines for `watch`/`wait` | Events stream into log pipelines without buffering a whole document. |
+| hickory resolver construction duplicated from netprobe (about 20 lines) instead of shared | Keeps `net-common` dependency-free; revisit if a third DNS user appears. |
