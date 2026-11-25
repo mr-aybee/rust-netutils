@@ -1,11 +1,12 @@
-use clap::Parser;
-use net_common::time::{iso8601, now_unix};
-use net_common::{Status, parse_duration};
-use portwatch::model::{Change, Filter, Scope, Snapshotter, Sock, diff};
 use std::io::Write;
 use std::net::IpAddr;
 use std::process::ExitCode;
 use std::time::Duration;
+
+use clap::Parser;
+use net_common::time::{iso8601, now_unix};
+use net_common::{Status, parse_duration};
+use portwatch::model::{Change, Filter, Scope, Snapshotter, Sock, diff};
 
 #[derive(Debug, Parser)]
 #[command(

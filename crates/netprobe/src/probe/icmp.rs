@@ -1,11 +1,13 @@
 //! ICMP echo probe built on the shared `net-icmp` engine.
 
-use super::{Outcome, ProbeResult, ms, tcp};
-use crate::target::Endpoint;
-pub use net_icmp::{IcmpSocket, PAYLOAD_LEN, SocketKind, build_echo, checksum};
 use std::io;
 use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
+
+pub use net_icmp::{IcmpSocket, PAYLOAD_LEN, SocketKind, build_echo, checksum};
+
+use super::{Outcome, ProbeResult, ms, tcp};
+use crate::target::Endpoint;
 
 /// Resolve to the first address of the host (port is ignored).
 pub async fn resolve_ip(host: &str) -> io::Result<IpAddr> {

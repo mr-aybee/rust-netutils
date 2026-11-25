@@ -1,11 +1,12 @@
 //! Socket snapshots, filtering and change detection.
 
+use std::collections::{BTreeMap, HashMap};
+use std::net::{IpAddr, SocketAddr};
+
 #[cfg(not(target_os = "linux"))]
 use netstat2::get_sockets_info;
 use netstat2::{AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo, TcpState};
 use serde::Serialize;
-use std::collections::{BTreeMap, HashMap};
-use std::net::{IpAddr, SocketAddr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(rename_all = "lowercase")]

@@ -1,9 +1,10 @@
 //! Command-line interface.
 
-use clap::{Args, Parser, Subcommand};
-use net_common::parse_duration;
 use std::path::PathBuf;
 use std::time::Duration;
+
+use clap::{Args, Parser, Subcommand};
+use net_common::parse_duration;
 
 #[derive(Debug, Parser)]
 #[command(

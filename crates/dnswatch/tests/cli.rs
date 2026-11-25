@@ -1,8 +1,6 @@
 //! End-to-end tests against programmable local DNS stubs (no internet required).
 #![allow(clippy::unwrap_used)] // Test fixtures: panicking on setup failure is the desired behavior.
 
-use assert_cmd::Command;
-use predicates::prelude::*;
 use std::collections::HashMap;
 use std::io::Read;
 use std::net::{SocketAddr, UdpSocket};
@@ -10,6 +8,9 @@ use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+
+use assert_cmd::Command;
+use predicates::prelude::*;
 
 /// What the stub answers for a name.
 #[derive(Clone)]

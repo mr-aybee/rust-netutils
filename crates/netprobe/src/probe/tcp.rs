@@ -1,10 +1,12 @@
 //! TCP connect probe: resolve, then attempt each address until one connects.
 
-use super::{ProbeResult, describe_io, ms};
-use crate::target::Endpoint;
 use std::net::SocketAddr;
 use std::time::Instant;
+
 use tokio::net::{TcpStream, lookup_host};
+
+use super::{ProbeResult, describe_io, ms};
+use crate::target::Endpoint;
 
 /// Resolve an endpoint using the system resolver.
 pub(crate) async fn resolve(ep: &Endpoint) -> std::io::Result<Vec<SocketAddr>> {

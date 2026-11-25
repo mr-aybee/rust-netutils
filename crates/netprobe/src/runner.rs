@@ -1,11 +1,13 @@
 //! Repetition, deadlines, pacing and cancellation for probes.
 
-use crate::probe::{Outcome, ProbeResult, ms};
-use crate::stats::{Summary, summarize};
-use net_common::Status;
-use serde::Serialize;
 use std::future::Future;
 use std::time::Duration;
+
+use net_common::Status;
+use serde::Serialize;
+
+use crate::probe::{Outcome, ProbeResult, ms};
+use crate::stats::{Summary, summarize};
 
 /// How many attempts to make and how to pace them.
 #[derive(Debug, Clone, Copy)]

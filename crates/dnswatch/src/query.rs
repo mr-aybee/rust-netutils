@@ -1,13 +1,14 @@
 //! DNS querying with a canonical, TTL-independent view of answers.
 
+use std::net::SocketAddr;
+use std::str::FromStr;
+use std::time::Duration;
+
 use hickory_resolver::TokioResolver;
 use hickory_resolver::config::{NameServerConfig, ResolverConfig};
 use hickory_resolver::net::runtime::TokioRuntimeProvider;
 use hickory_resolver::proto::rr::RecordType;
 use serde::Serialize;
-use std::net::SocketAddr;
-use std::str::FromStr;
-use std::time::Duration;
 
 pub const SUPPORTED: &[&str] = &[
     "A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "PTR", "SRV", "CAA",

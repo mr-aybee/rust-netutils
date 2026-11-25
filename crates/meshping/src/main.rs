@@ -1,3 +1,9 @@
+use std::io::Write;
+use std::net::IpAddr;
+use std::process::ExitCode;
+use std::sync::Arc;
+use std::time::Duration;
+
 use clap::{Parser, ValueEnum};
 use meshping::probe::{Mode, Prober};
 use meshping::stats::{HostStats, Snapshot};
@@ -5,11 +11,6 @@ use net_common::target::{Endpoint, parse_endpoint};
 use net_common::time::{iso8601, now_unix};
 use net_common::{Status, parse_duration};
 use net_icmp::Pinger;
-use std::io::Write;
-use std::net::IpAddr;
-use std::process::ExitCode;
-use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::mpsc;
 
 const MAX_HOSTS: usize = 10_000;

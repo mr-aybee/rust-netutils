@@ -1,9 +1,10 @@
 //! Per-host probing: ICMP echo or TCP connect timing.
 
-use net_icmp::{Echo, Pinger};
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use net_icmp::{Echo, Pinger};
 use tokio::net::TcpStream;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]

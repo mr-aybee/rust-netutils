@@ -5,14 +5,15 @@
 //! closed immediately after the handshake. A failed verification is always
 //! reported as a failure; it is never hidden.
 
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+
 use rustls::client::WebPkiServerVerifier;
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::CryptoProvider;
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme};
-use std::path::Path;
-use std::sync::{Arc, Mutex};
 
 pub fn provider() -> Arc<CryptoProvider> {
     Arc::new(rustls::crypto::ring::default_provider())

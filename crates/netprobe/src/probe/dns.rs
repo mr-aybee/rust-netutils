@@ -1,15 +1,17 @@
 //! DNS probe using hickory-resolver with caching disabled so every attempt
 //! performs a real query.
 
-use super::{Outcome, ProbeResult, ms};
+use std::net::SocketAddr;
+use std::str::FromStr;
+use std::time::{Duration, Instant};
+
 use hickory_resolver::TokioResolver;
 use hickory_resolver::config::{NameServerConfig, ResolverConfig, ResolverOpts};
 use hickory_resolver::net::NetError;
 use hickory_resolver::net::runtime::TokioRuntimeProvider;
 use hickory_resolver::proto::rr::RecordType;
-use std::net::SocketAddr;
-use std::str::FromStr;
-use std::time::{Duration, Instant};
+
+use super::{Outcome, ProbeResult, ms};
 
 /// Record types supported by the probe.
 pub const SUPPORTED: &[&str] = &[

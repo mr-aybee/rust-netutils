@@ -4,8 +4,11 @@
 //! `Connection: close`, no redirect following. Timing phases are reported
 //! separately (DNS, connect, TLS handshake, time to first byte).
 
-use super::{Outcome, ProbeResult, describe_io, ms, tcp};
-use crate::url::HttpUrl;
+use std::io;
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Instant;
+
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::crypto::{
     CryptoProvider, WebPkiSupportedAlgorithms, verify_tls12_signature, verify_tls13_signature,
@@ -13,11 +16,10 @@ use rustls::crypto::{
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use rustls::{ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme};
-use std::io;
-use std::path::Path;
-use std::sync::Arc;
-use std::time::Instant;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+
+use super::{Outcome, ProbeResult, describe_io, ms, tcp};
+use crate::url::HttpUrl;
 
 /// Maximum response head size accepted; larger heads are reported as errors.
 const MAX_HEAD: usize = 16 * 1024;

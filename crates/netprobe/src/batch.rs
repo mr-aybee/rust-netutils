@@ -9,16 +9,18 @@
 //! icmp 10.0.0.1
 //! ```
 
+use std::sync::Arc;
+use std::time::Duration;
+
+use hickory_resolver::TokioResolver;
+use hickory_resolver::proto::rr::RecordType;
+use rustls::ClientConfig;
+use tokio::task::JoinSet;
+
 use crate::probe::{ProbeResult, dns, http, icmp, tcp, udp};
 use crate::runner::{self, Plan, Report};
 use crate::target::{Endpoint, parse_endpoint, validate_host};
 use crate::url::{HttpUrl, parse_url};
-use hickory_resolver::TokioResolver;
-use hickory_resolver::proto::rr::RecordType;
-use rustls::ClientConfig;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::task::JoinSet;
 
 /// Upper bound on jobs per batch file, to keep memory predictable.
 pub const MAX_JOBS: usize = 100_000;

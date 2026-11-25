@@ -1,11 +1,13 @@
 //! Inspection of local certificate files (PEM bundles or a single DER certificate).
 
-use crate::cert;
-use crate::check::{CheckResult, Policy, evaluate, now_unix};
-use rustls::pki_types::CertificateDer;
-use rustls::pki_types::pem::PemObject;
 use std::path::Path;
 use std::time::Instant;
+
+use rustls::pki_types::CertificateDer;
+use rustls::pki_types::pem::PemObject;
+
+use crate::cert;
+use crate::check::{CheckResult, Policy, evaluate, now_unix};
 
 /// Refuse files larger than this to keep memory bounded.
 pub const MAX_FILE: u64 = 16 * 1024 * 1024;

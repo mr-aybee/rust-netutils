@@ -1,7 +1,8 @@
 //! Rolling per-host statistics over a bounded window of samples.
 
-use serde::Serialize;
 use std::collections::VecDeque;
+
+use serde::Serialize;
 
 /// Statistics for one host: lifetime counters plus a rolling window.
 #[derive(Debug, Clone)]

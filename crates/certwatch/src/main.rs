@@ -1,3 +1,7 @@
+use std::io::Write;
+use std::process::ExitCode;
+use std::sync::Arc;
+
 use certwatch::check::{self, CheckResult, Policy, Verdict};
 use certwatch::cli::{Cli, Command, PolicyArgs};
 use certwatch::output::{self, Summary};
@@ -5,9 +9,6 @@ use certwatch::{inspect, tls};
 use clap::Parser;
 use net_common::Status;
 use net_common::target::{Endpoint, parse_endpoint};
-use std::io::Write;
-use std::process::ExitCode;
-use std::sync::Arc;
 use tokio::task::JoinSet;
 
 /// Upper bound on targets per run.

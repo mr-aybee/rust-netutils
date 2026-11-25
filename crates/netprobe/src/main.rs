@@ -1,3 +1,6 @@
+use std::io::Write;
+use std::process::ExitCode;
+
 use clap::Parser;
 use net_common::Status;
 use netprobe::cli::{Cli, Command};
@@ -5,8 +8,6 @@ use netprobe::output::{self, Verbosity};
 use netprobe::probe::{dns, http, icmp, tcp, udp};
 use netprobe::runner::{self, Plan, Report};
 use netprobe::target::parse_endpoint;
-use std::io::Write;
-use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let cli = match Cli::try_parse() {

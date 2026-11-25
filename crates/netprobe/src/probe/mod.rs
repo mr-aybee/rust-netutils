@@ -6,10 +6,11 @@ pub mod icmp;
 pub mod tcp;
 pub mod udp;
 
-use serde::Serialize;
 use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
+
+use serde::Serialize;
 
 /// Outcome of a single probe attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

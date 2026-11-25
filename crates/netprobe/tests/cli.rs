@@ -1,12 +1,13 @@
 //! End-to-end CLI tests against local fixtures (no internet access required).
 #![allow(clippy::unwrap_used)] // Test fixtures: panicking on setup failure is the desired behavior.
 
-use assert_cmd::Command;
-use predicates::prelude::*;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, UdpSocket};
 use std::thread;
 use std::time::Duration;
+
+use assert_cmd::Command;
+use predicates::prelude::*;
 
 fn netprobe() -> Command {
     Command::cargo_bin("netprobe").unwrap()
@@ -159,10 +160,12 @@ fn http_timeout_when_server_silent() {
 
 /// Minimal TLS server using a certificate issued for "localhost".
 mod tls {
-    use super::*;
+    use std::sync::Arc;
+
     use rustls::ServerConfig;
     use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
-    use std::sync::Arc;
+
+    use super::*;
 
     pub fn serve_tls(dir: &std::path::Path) -> (SocketAddr, std::path::PathBuf) {
         let cert = rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();

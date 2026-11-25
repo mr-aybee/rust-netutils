@@ -1,13 +1,14 @@
-use clap::{Args, Parser, Subcommand};
-use dnswatch::query::{self, Answer, Source};
-use dnswatch::run::{self, Query, Settings};
-use net_common::target::{parse_endpoint, validate_host};
-use net_common::{Status, parse_duration};
 use std::io::Write;
 use std::net::{IpAddr, SocketAddr};
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Duration;
+
+use clap::{Args, Parser, Subcommand};
+use dnswatch::query::{self, Answer, Source};
+use dnswatch::run::{self, Query, Settings};
+use net_common::target::{parse_endpoint, validate_host};
+use net_common::{Status, parse_duration};
 
 /// Upper bound on name × type × server combinations per run.
 const MAX_QUERIES: usize = 10_000;

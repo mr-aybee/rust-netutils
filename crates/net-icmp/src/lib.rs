@@ -8,10 +8,11 @@
 //! If neither is permitted the probe fails with an explanatory error. There is
 //! never a silent fallback to another protocol.
 
-use socket2::{Domain, Protocol, Socket, Type};
 use std::io;
 use std::net::{IpAddr, SocketAddr};
 use std::time::{Duration, Instant};
+
+use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
 
 const ECHO_REQUEST_V4: u8 = 8;

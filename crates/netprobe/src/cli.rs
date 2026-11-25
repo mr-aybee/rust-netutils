@@ -1,8 +1,9 @@
 //! Command-line interface definition.
 
+use std::time::Duration;
+
 use clap::{Args, Parser, Subcommand};
 use net_common::parse_duration;
-use std::time::Duration;
 
 #[derive(Debug, Parser)]
 #[command(

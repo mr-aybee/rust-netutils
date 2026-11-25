@@ -1,14 +1,16 @@
 //! Polling rounds and the watch / wait / compare workflows.
 
-use crate::query::{Answer, Source, diff, query};
-use hickory_resolver::proto::rr::RecordType;
-use net_common::time::{iso8601, now_unix};
-use serde::Serialize;
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
+
+use hickory_resolver::proto::rr::RecordType;
+use net_common::time::{iso8601, now_unix};
+use serde::Serialize;
 use tokio::task::JoinSet;
+
+use crate::query::{Answer, Source, diff, query};
 
 /// One (name, type) pair to query on every source.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

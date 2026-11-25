@@ -1,8 +1,10 @@
 //! Human and JSON rendering.
 
-use crate::check::{CheckResult, Verdict};
-use serde::Serialize;
 use std::io::{self, Write};
+
+use serde::Serialize;
+
+use crate::check::{CheckResult, Verdict};
 
 fn expiry_text(r: &CheckResult) -> Option<String> {
     let leaf = r.chain.first()?;

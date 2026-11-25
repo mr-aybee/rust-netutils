@@ -1,9 +1,11 @@
 //! Human and JSON rendering. Data goes to stdout, diagnostics to stderr.
 
+use std::io::{self, Write};
+
+use serde::Serialize;
+
 use crate::probe::{Outcome, ProbeResult};
 use crate::runner::Report;
-use serde::Serialize;
-use std::io::{self, Write};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Verbosity {

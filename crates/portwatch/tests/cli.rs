@@ -2,13 +2,14 @@
 //! (their owner PID is always visible without privileges).
 #![allow(clippy::unwrap_used)] // Test fixtures: panicking on setup failure is the desired behavior.
 
-use assert_cmd::Command;
-use predicates::prelude::*;
 use std::io::Read;
 use std::net::{TcpListener, TcpStream, UdpSocket};
 use std::process::Stdio;
 use std::thread;
 use std::time::{Duration, Instant};
+
+use assert_cmd::Command;
+use predicates::prelude::*;
 
 fn portwatch() -> Command {
     let mut c = Command::cargo_bin("portwatch").unwrap();

@@ -6,12 +6,14 @@
 //! - ICMP port unreachable     -> Failed (reported by the OS as refused/reset)
 //! - no reply before deadline  -> Inconclusive
 
-use super::{Outcome, ProbeResult, describe_io, ms, tcp};
-use crate::target::Endpoint;
 use std::io;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::{Duration, Instant};
+
 use tokio::net::UdpSocket;
+
+use super::{Outcome, ProbeResult, describe_io, ms, tcp};
+use crate::target::Endpoint;
 
 /// Largest UDP payload over IPv4.
 pub const MAX_PAYLOAD: usize = 65_507;

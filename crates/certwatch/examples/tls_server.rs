@@ -3,11 +3,12 @@
 //! Usage: cargo run --release --example tls_server -- 127.0.0.1:17443 /tmp/dir
 #![allow(clippy::unwrap_used)] // Fixture binary: fail fast.
 
-use rcgen::{BasicConstraints, CertificateParams, CertifiedIssuer, DnType, IsCa, KeyPair};
-use rustls::pki_types::{PrivateKeyDer, PrivatePkcs8KeyDer};
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::Arc;
+
+use rcgen::{BasicConstraints, CertificateParams, CertifiedIssuer, DnType, IsCa, KeyPair};
+use rustls::pki_types::{PrivateKeyDer, PrivatePkcs8KeyDer};
 
 fn main() {
     let mut args = std::env::args().skip(1);

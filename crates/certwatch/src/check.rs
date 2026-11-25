@@ -1,15 +1,17 @@
 //! Remote certificate check: connect, handshake, evaluate policy.
 
-use crate::cert::{self, CertInfo};
-use crate::tls::{RecordingVerifier, classify};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
 use net_common::target::Endpoint;
 use rustls::client::WebPkiServerVerifier;
 use rustls::pki_types::ServerName;
 use serde::Serialize;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
 use tokio::net::{TcpStream, lookup_host};
+
+use crate::cert::{self, CertInfo};
+use crate::tls::{RecordingVerifier, classify};
 
 /// Overall verdict for one target, ordered by severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
