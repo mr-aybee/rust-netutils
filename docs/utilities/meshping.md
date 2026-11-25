@@ -121,6 +121,7 @@ meshping -m tcp api.example.com:443 db.example.com:5432
 
 - **Linux**: enable unprivileged ICMP with `sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"`. Otherwise use `sudo`, `CAP_NET_RAW`, or TCP mode.
 - **Windows**: ICMP uses `IcmpSendEcho`/`Icmp6SendEcho2`, one blocking call per probe on Tokio's blocking pool.
+- **Windows, TCP mode**: Windows retries a SYN that was answered with RST for about 2 s before reporting the refusal. A **closed** port therefore shows as loss (when the timeout is shorter) or as about 2 s of latency (when it is longer). Target an **open** port in TCP mode on Windows. Refused-port timing is only meaningful on Linux and macOS.
 - CI builds and tests on Linux, Windows and macOS. The deterministic tests use TCP mode, because ICMP permission differs between CI runners.
 
 ## Limitations

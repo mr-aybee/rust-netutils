@@ -12,4 +12,5 @@ All notable changes to this crate are documented here. The format follows
 - One shared ICMP socket per address family with a reply dispatcher, so the per-packet cost does not grow with the number of hosts.
 - Rolling-window statistics (`--window`): loss, last, min, avg, p95, max, jitter; lifetime sent and loss.
 - Output: periodic table (`--report`), CSV or JSON Lines per probe; final summary.
+- Known limitation: on Windows, TCP mode can only time open ports, because Windows delays refusals by retrying SYNs.
 - `--count`, `--interval`, `--timeout` (≤ interval), host files; exit 1 if any host never replied.

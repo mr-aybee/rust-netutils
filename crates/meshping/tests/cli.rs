@@ -44,6 +44,9 @@ fn tcp_mode_counts_and_table() {
         );
 }
 
+/// Windows retries a refused SYN for ~2 s before reporting it, so a closed port
+/// cannot be timed there (documented limitation); the open-port tests cover Windows.
+#[cfg(not(windows))]
 #[test]
 fn refused_connection_is_a_reply_not_loss() {
     let closed = closed_port();
