@@ -96,6 +96,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Please run `cargo fmt`, `cargo clippy --
 
 Report vulnerabilities privately; see [SECURITY.md](SECURITY.md). These tools are intended for networks you own or are authorized to test.
 
+## Code of Conduct
+
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By participating you agree to uphold it.
+
 ## License
 
 Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
